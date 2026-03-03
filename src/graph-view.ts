@@ -100,18 +100,28 @@ export class SemanticGraphView extends ItemView {
 							this.setStatus(`UMAP: ${epoch}/${total}`);
 						});
 
-						// Scale UMAP output to ±180 range
+						// Scale UMAP output to ±250 range
 						const posMap = new Map<string, [number, number, number]>();
 						paths.forEach((p, i) => posMap.set(p, coords[i] as [number, number, number]));
-						this.scalePositions(posMap, 180);
+						this.scalePositions(posMap, 250);
 
-						// Apply as initial positions (not pinned — force sim runs freely)
+						// Enforce minimum distance between nodes so they don't overlap
+						this.enforceMinDistance(posMap, 12);
+
+						// Create folder nodes at median of children's UMAP positions
+						this.addFolderNodes(graphData, posMap);
+
+						// Set initial positions + home positions (spring force target)
+						// No fx/fy/fz — simulation runs freely, home force keeps semantic layout
 						for (const node of graphData.nodes) {
 							const pos = posMap.get(node.path);
 							if (pos) {
 								node.x = pos[0];
 								node.y = pos[1];
 								node.z = pos[2];
+								node.homeX = pos[0];
+								node.homeY = pos[1];
+								node.homeZ = pos[2];
 							}
 						}
 					}
@@ -134,6 +144,106 @@ export class SemanticGraphView extends ItemView {
 			const msg = err?.message || String(err);
 			this.showError(`Error: ${msg}`);
 			new Notice(`3D Semantic Graph: ${msg}`);
+		}
+	}
+
+	/**
+	 * Create folder nodes positioned at the median of children's UMAP vectors.
+	 * Children keep their original UMAP positions (relative offset from folder).
+	 */
+	private addFolderNodes(
+		graphData: GraphData,
+		posMap: Map<string, [number, number, number]>
+	): void {
+		// Group notes by their parent folder
+		const folderChildren = new Map<string, string[]>();
+		for (const node of graphData.nodes) {
+			if (!posMap.has(node.path)) continue;
+			const idx = node.path.lastIndexOf("/");
+			const folderPath = idx > 0 ? node.path.substring(0, idx) : "";
+			if (!folderChildren.has(folderPath)) folderChildren.set(folderPath, []);
+			folderChildren.get(folderPath)!.push(node.path);
+		}
+
+		for (const [folderPath, childPaths] of folderChildren) {
+			const positions = childPaths
+				.map((p) => posMap.get(p))
+				.filter((p): p is [number, number, number] => !!p);
+			if (positions.length < 2) continue; // skip single-note folders
+
+			const medX = this.median(positions.map((p) => p[0]));
+			const medY = this.median(positions.map((p) => p[1]));
+			const medZ = this.median(positions.map((p) => p[2]));
+
+			// Use the same color as children (they share a folder color)
+			const firstChild = graphData.nodes.find((n) => n.path === childPaths[0]);
+
+			const folderId = `__folder__:${folderPath}`;
+			graphData.nodes.push({
+				id: folderId,
+				name: folderPath.split("/").pop() || "/",
+				path: folderId,
+				color: firstChild?.color ?? "#888888",
+				size: Math.max(5, Math.log2(positions.length + 1) * 3),
+				isFolder: true,
+			});
+			posMap.set(folderId, [medX, medY, medZ]);
+
+			// Link folder to each child
+			for (const cp of childPaths) {
+				graphData.links.push({
+					source: folderId,
+					target: cp,
+					similarity: 0.3,
+					isFolderLink: true,
+				});
+			}
+		}
+	}
+
+	private median(values: number[]): number {
+		const sorted = [...values].sort((a, b) => a - b);
+		const mid = Math.floor(sorted.length / 2);
+		return sorted.length % 2 === 0
+			? (sorted[mid - 1] + sorted[mid]) / 2
+			: sorted[mid];
+	}
+
+	/**
+	 * Push apart nodes that are closer than minDist.
+	 * Runs multiple iterations until no violations remain (or max iterations).
+	 */
+	private enforceMinDistance(
+		posMap: Map<string, [number, number, number]>,
+		minDist: number,
+		maxIterations = 30
+	): void {
+		const entries = Array.from(posMap.entries());
+		for (let iter = 0; iter < maxIterations; iter++) {
+			let moved = false;
+			for (let i = 0; i < entries.length; i++) {
+				for (let j = i + 1; j < entries.length; j++) {
+					const [, a] = entries[i];
+					const [, b] = entries[j];
+					const dx = b[0] - a[0];
+					const dy = b[1] - a[1];
+					const dz = b[2] - a[2];
+					const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+					if (dist < minDist && dist > 0) {
+						const push = (minDist - dist) / dist / 2;
+						a[0] -= dx * push; a[1] -= dy * push; a[2] -= dz * push;
+						b[0] += dx * push; b[1] += dy * push; b[2] += dz * push;
+						moved = true;
+					} else if (dist === 0) {
+						// Exact overlap — scatter randomly
+						a[0] += (Math.random() - 0.5) * minDist;
+						a[1] += (Math.random() - 0.5) * minDist;
+						a[2] += (Math.random() - 0.5) * minDist;
+						moved = true;
+					}
+				}
+			}
+			if (!moved) break;
 		}
 	}
 

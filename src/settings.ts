@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import SemanticGraphPlugin from "./main";
+import { DEFAULT_SETTINGS } from "./types";
 
 export class SemanticGraphSettingTab extends PluginSettingTab {
 	plugin: SemanticGraphPlugin;
@@ -20,7 +21,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("API Key")
-			.setDesc("Your OpenAI API key for generating embeddings.")
+			.setDesc("OpenAI API key for generating embeddings. Leave empty to use sphere layout without semantic positioning.")
 			.addText((text) =>
 				text
 					.setPlaceholder("sk-...")
@@ -37,9 +38,9 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			.setDesc("OpenAI embedding model to use.")
 			.addDropdown((dropdown) =>
 				dropdown
-					.addOption("text-embedding-3-small", "text-embedding-3-small (1536D, cheapest)")
-					.addOption("text-embedding-3-large", "text-embedding-3-large (3072D)")
-					.addOption("text-embedding-ada-002", "text-embedding-ada-002 (1536D, legacy)")
+					.addOption("text-embedding-3-small", "text-embedding-3-small (1536D, fast)")
+					.addOption("text-embedding-3-large", "text-embedding-3-large (3072D, accurate)")
+					.addOption("text-embedding-ada-002", "text-embedding-ada-002 (legacy)")
 					.setValue(this.plugin.settings.embeddingModel)
 					.onChange(async (value) => {
 						this.plugin.settings.embeddingModel = value;
@@ -49,20 +50,6 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		// --- Graph Settings ---
 		containerEl.createEl("h3", { text: "Graph" });
-
-		new Setting(containerEl)
-			.setName("Similarity Threshold")
-			.setDesc("Minimum cosine similarity to draw a link between notes (0.5–0.95).")
-			.addSlider((slider) =>
-				slider
-					.setLimits(0.5, 0.95, 0.05)
-					.setValue(this.plugin.settings.similarityThreshold)
-					.setDynamicTooltip()
-					.onChange(async (value) => {
-						this.plugin.settings.similarityThreshold = value;
-						await this.plugin.saveSettings();
-					})
-			);
 
 		new Setting(containerEl)
 			.setName("Node Color By")
@@ -78,40 +65,6 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					})
 			);
 
-		// --- UMAP Settings ---
-		containerEl.createEl("h3", { text: "UMAP Parameters" });
-
-		new Setting(containerEl)
-			.setName("Number of Neighbors")
-			.setDesc("Controls local vs global structure preservation (5–50, default 15).")
-			.addSlider((slider) =>
-				slider
-					.setLimits(5, 50, 1)
-					.setValue(this.plugin.settings.umapNNeighbors)
-					.setDynamicTooltip()
-					.onChange(async (value) => {
-						this.plugin.settings.umapNNeighbors = value;
-						await this.plugin.saveSettings();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Minimum Distance")
-			.setDesc("Controls how tightly UMAP packs points (0.0–0.99, default 0.1).")
-			.addSlider((slider) =>
-				slider
-					.setLimits(0, 0.99, 0.01)
-					.setValue(this.plugin.settings.umapMinDist)
-					.setDynamicTooltip()
-					.onChange(async (value) => {
-						this.plugin.settings.umapMinDist = value;
-						await this.plugin.saveSettings();
-					})
-			);
-
-		// --- Exclude Folders ---
-		containerEl.createEl("h3", { text: "Filters" });
-
 		new Setting(containerEl)
 			.setName("Exclude Folders")
 			.setDesc("Comma-separated list of folders to exclude from the graph.")
@@ -125,6 +78,55 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 							.map((s) => s.trim())
 							.filter((s) => s.length > 0);
 						await this.plugin.saveSettings();
+					})
+			);
+
+		// --- UMAP Settings ---
+		containerEl.createEl("h3", { text: "UMAP Parameters" });
+
+		new Setting(containerEl)
+			.setName("Number of Neighbors")
+			.setDesc("Controls local vs global structure (5–50). Lower = tighter clusters, Higher = broader spread. Default: 15")
+			.addSlider((slider) =>
+				slider
+					.setLimits(5, 50, 1)
+					.setValue(this.plugin.settings.umapNNeighbors)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.umapNNeighbors = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Minimum Distance")
+			.setDesc("How tightly UMAP packs similar points (0.0–0.99). Lower = more clustered. Default: 0.1")
+			.addSlider((slider) =>
+				slider
+					.setLimits(0, 0.99, 0.01)
+					.setValue(this.plugin.settings.umapMinDist)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.umapMinDist = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		// --- Reset ---
+		containerEl.createEl("h3", { text: "Reset" });
+
+		new Setting(containerEl)
+			.setName("Reset to Defaults")
+			.setDesc("Restore all settings to their default values (API key is preserved).")
+			.addButton((btn) =>
+				btn
+					.setButtonText("Reset")
+					.setWarning()
+					.onClick(async () => {
+						const apiKey = this.plugin.settings.openaiApiKey;
+						this.plugin.settings = { ...DEFAULT_SETTINGS, openaiApiKey: apiKey };
+						await this.plugin.saveSettings();
+						this.display();
 					})
 			);
 	}

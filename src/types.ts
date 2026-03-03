@@ -1,7 +1,6 @@
 export interface PluginSettings {
 	openaiApiKey: string;
 	embeddingModel: string;
-	similarityThreshold: number;
 	umapNNeighbors: number;
 	umapMinDist: number;
 	nodeColorBy: "folder" | "tag";
@@ -11,7 +10,6 @@ export interface PluginSettings {
 export const DEFAULT_SETTINGS: PluginSettings = {
 	openaiApiKey: "",
 	embeddingModel: "text-embedding-3-small",
-	similarityThreshold: 0.7,
 	umapNNeighbors: 15,
 	umapMinDist: 0.1,
 	nodeColorBy: "folder",
@@ -42,12 +40,19 @@ export interface GraphNode {
 	fx?: number;
 	fy?: number;
 	fz?: number;
+	// UMAP semantic home positions (spring force target)
+	homeX?: number;
+	homeY?: number;
+	homeZ?: number;
+	// Folder node flag
+	isFolder?: boolean;
 }
 
 export interface GraphLink {
 	source: string;
 	target: string;
 	similarity: number;
+	isFolderLink?: boolean;
 }
 
 export interface GraphData {
