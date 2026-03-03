@@ -16,63 +16,54 @@ const FOLDER_COLORS = [
 
 export function buildGraphData(
 	app: App,
-	settings: PluginSettings,
-	embeddings: Map<string, number[]>,
-	positions: Map<string, [number, number, number]>
+	settings: PluginSettings
 ): GraphData {
 	const nodes: GraphNode[] = [];
 	const colorMap = new Map<string, string>();
 	let colorIndex = 0;
 
-	// Build nodes
-	for (const [path, embedding] of embeddings) {
-		const file = app.vault.getAbstractFileByPath(path);
-		if (!(file instanceof TFile)) continue;
+	const files = app.vault.getMarkdownFiles().filter((file) => {
+		return !settings.excludeFolders.some(
+			(folder) => file.path.startsWith(folder + "/") || file.path === folder
+		);
+	});
 
-		const name = file.basename;
+	const nodeSet = new Set<string>();
+
+	for (const file of files) {
 		const groupKey = getGroupKey(app, file, settings.nodeColorBy);
-
 		if (!colorMap.has(groupKey)) {
 			colorMap.set(groupKey, FOLDER_COLORS[colorIndex % FOLDER_COLORS.length]);
 			colorIndex++;
 		}
 
-		const pos = positions.get(path);
 		const stat = file.stat;
 		const size = Math.max(2, Math.min(8, Math.log2(stat.size / 100 + 1) + 2));
 
-		const node: GraphNode = {
-			id: path,
-			name,
-			path,
+		nodes.push({
+			id: file.path,
+			name: file.basename,
+			path: file.path,
 			color: colorMap.get(groupKey)!,
 			size,
-		};
+		});
 
-		if (pos) {
-			node.x = pos[0];
-			node.y = pos[1];
-			node.z = pos[2];
-		}
-
-		nodes.push(node);
+		nodeSet.add(file.path);
 	}
 
-	// Build links based on cosine similarity
+	// Build links from Obsidian's actual wiki-links
 	const links: GraphLink[] = [];
-	const paths = Array.from(embeddings.keys());
-	const vectors = paths.map((p) => embeddings.get(p)!);
+	const resolvedLinks = app.metadataCache.resolvedLinks;
+	const seen = new Set<string>();
 
-	for (let i = 0; i < paths.length; i++) {
-		for (let j = i + 1; j < paths.length; j++) {
-			const sim = cosineSimilarity(vectors[i], vectors[j]);
-			if (sim >= settings.similarityThreshold) {
-				links.push({
-					source: paths[i],
-					target: paths[j],
-					similarity: sim,
-				});
-			}
+	for (const [sourcePath, targets] of Object.entries(resolvedLinks)) {
+		if (!nodeSet.has(sourcePath)) continue;
+		for (const targetPath of Object.keys(targets)) {
+			if (!nodeSet.has(targetPath)) continue;
+			const key = [sourcePath, targetPath].sort().join("|");
+			if (seen.has(key)) continue;
+			seen.add(key);
+			links.push({ source: sourcePath, target: targetPath, similarity: 1 });
 		}
 	}
 
@@ -82,9 +73,7 @@ export function buildGraphData(
 function getGroupKey(app: App, file: TFile, colorBy: "folder" | "tag"): string {
 	if (colorBy === "tag") {
 		const cache = app.metadataCache.getFileCache(file);
-		if (cache?.tags && cache.tags.length > 0) {
-			return cache.tags[0].tag;
-		}
+		if (cache?.tags && cache.tags.length > 0) return cache.tags[0].tag;
 		if (cache?.frontmatter?.tags) {
 			const tags = cache.frontmatter.tags;
 			if (Array.isArray(tags) && tags.length > 0) return "#" + tags[0];
@@ -92,20 +81,5 @@ function getGroupKey(app: App, file: TFile, colorBy: "folder" | "tag"): string {
 		}
 		return "(untagged)";
 	}
-	// folder
 	return file.parent?.path || "/";
-}
-
-function cosineSimilarity(a: number[], b: number[]): number {
-	let dot = 0;
-	let normA = 0;
-	let normB = 0;
-	for (let i = 0; i < a.length; i++) {
-		dot += a[i] * b[i];
-		normA += a[i] * a[i];
-		normB += b[i] * b[i];
-	}
-	const denom = Math.sqrt(normA) * Math.sqrt(normB);
-	if (denom === 0) return 0;
-	return dot / denom;
 }
