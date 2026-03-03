@@ -1,0 +1,62 @@
+.semantic-graph-container {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	overflow: hidden;
+}
+
+.semantic-graph-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	flex-shrink: 0;
+}
+
+.semantic-graph-btn {
+	padding: 4px 12px;
+	border-radius: 4px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--interactive-normal);
+	color: var(--text-normal);
+	cursor: pointer;
+	font-size: 12px;
+}
+
+.semantic-graph-btn:hover {
+	background: var(--interactive-hover);
+}
+
+.semantic-graph-status {
+	font-size: 12px;
+	color: var(--text-muted);
+	margin-left: auto;
+}
+
+.semantic-graph-canvas {
+	flex: 1;
+	position: relative;
+	overflow: hidden;
+}
+
+.semantic-graph-canvas canvas {
+	display: block;
+}
+
+.semantic-graph-error {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	padding: 40px;
+	text-align: center;
+}
+
+.semantic-graph-error p {
+	color: var(--text-muted);
+	font-size: 14px;
+	max-width: 400px;
+	line-height: 1.6;
+}

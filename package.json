@@ -1,0 +1,26 @@
+{
+	"name": "obsidian-3d-semantic-graph",
+	"version": "1.0.0",
+	"description": "3D Semantic Graph plugin for Obsidian",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "node esbuild.config.mjs production"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "MIT",
+	"dependencies": {
+		"3d-force-graph": "^1.73.0",
+		"three": "^0.170.0",
+		"umap-js": "^1.4.0"
+	},
+	"devDependencies": {
+		"@types/node": "^16.11.6",
+		"@types/three": "^0.160.0",
+		"esbuild": "0.25.5",
+		"obsidian": "latest",
+		"tslib": "2.4.0",
+		"typescript": "^5.8.3"
+	}
+}
