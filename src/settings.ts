@@ -66,6 +66,32 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Projection Method")
+			.setDesc("Choose the algorithm used to project embeddings into 3D.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("umap", "UMAP")
+					.addOption("pca", "PCA")
+					.setValue(this.plugin.settings.projectionMethod)
+					.onChange(async (value: "umap" | "pca") => {
+						this.plugin.settings.projectionMethod = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Sphereize Data")
+			.setDesc("Project reduced embedding coordinates toward a sphere surface. Turn off to keep points distributed inside the 3D volume.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.sphereizeData)
+					.onChange(async (value) => {
+						this.plugin.settings.sphereizeData = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName("Show Links")
 			.setDesc("Display connection lines between nodes.")
 			.addToggle((toggle) =>
@@ -73,6 +99,64 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.showLinks)
 					.onChange(async (value) => {
 						this.plugin.settings.showLinks = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		containerEl.createEl("h3", { text: "Appearance" });
+
+		new Setting(containerEl)
+			.setName("Scene Theme")
+			.setDesc("Choose the background style for the 3D stage.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("dark", "Dark")
+					.addOption("light", "Light")
+					.setValue(this.plugin.settings.sceneTheme)
+					.onChange(async (value: "dark" | "light") => {
+						this.plugin.settings.sceneTheme = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Node Asset")
+			.setDesc("Render nodes as volumetric 3D meshes or billboarded 2D sprites.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("3d", "3D Asset")
+					.addOption("2d", "2D Asset")
+					.setValue(this.plugin.settings.nodeAssetMode)
+					.onChange(async (value: "3d" | "2d") => {
+						this.plugin.settings.nodeAssetMode = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Node Opacity")
+			.setDesc("Adjust node transparency.")
+			.addSlider((slider) =>
+				slider
+					.setLimits(0.15, 1, 0.05)
+					.setValue(this.plugin.settings.nodeOpacity)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.nodeOpacity = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Drag Sensitivity")
+			.setDesc("Adjust how strongly the camera responds when dragging the graph.")
+			.addSlider((slider) =>
+				slider
+					.setLimits(0.2, 3, 0.1)
+					.setValue(this.plugin.settings.dragSensitivity)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.dragSensitivity = value;
 						await this.plugin.saveSettings();
 					})
 			);

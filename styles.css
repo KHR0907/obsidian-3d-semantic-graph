@@ -53,6 +53,14 @@
 	position: relative;
 }
 
+.semantic-graph-stage.semantic-graph-theme-dark {
+	background: #0f172a;
+}
+
+.semantic-graph-stage.semantic-graph-theme-light {
+	background: #f8fafc;
+}
+
 .semantic-graph-inspector {
 	width: 320px;
 	flex-shrink: 0;
@@ -196,6 +204,18 @@
 	transition: opacity 120ms ease, transform 120ms ease;
 }
 
+.semantic-graph-stage.semantic-graph-theme-dark .semantic-graph-hover-card {
+	border-color: color-mix(in srgb, var(--background-modifier-border) 70%, white 10%);
+	background: color-mix(in srgb, var(--background-primary) 84%, black 16%);
+	box-shadow: 0 12px 32px rgb(0 0 0 / 0.22);
+}
+
+.semantic-graph-stage.semantic-graph-theme-light .semantic-graph-hover-card {
+	border-color: rgb(148 163 184 / 0.5);
+	background: rgb(255 255 255 / 0.9);
+	box-shadow: 0 14px 36px rgb(15 23 42 / 0.12);
+}
+
 .semantic-graph-hover-card.is-visible {
 	opacity: 1;
 	transform: translateY(0);
@@ -220,6 +240,18 @@
 	font-size: 11px;
 	letter-spacing: 0.02em;
 	color: var(--text-faint);
+}
+
+.semantic-graph-stage.semantic-graph-theme-light .semantic-graph-hover-title {
+	color: #0f172a;
+}
+
+.semantic-graph-stage.semantic-graph-theme-light .semantic-graph-hover-path {
+	color: #475569;
+}
+
+.semantic-graph-stage.semantic-graph-theme-light .semantic-graph-hover-meta {
+	color: #64748b;
 }
 
 .semantic-graph-error {

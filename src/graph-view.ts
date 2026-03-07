@@ -1,16 +1,18 @@
 import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
-import { GraphNode, PluginSettings } from "./types";
+import { GraphNode, GraphVisualOptions, PluginSettings } from "./types";
 import { EmbeddingService } from "./embedding";
 import { GraphInspectorPanel } from "./graph-inspector";
+import { PcaReducer } from "./pca-reducer";
 import { UmapReducer } from "./umap-reducer";
 import { buildGraphData } from "./graph-data";
 import { GraphRenderer } from "./graph-renderer";
 
 export const VIEW_TYPE = "semantic-graph-3d";
 
-const SPHERE_LAYOUT_RADIUS = 250;
-const MIN_NODE_DISTANCE = 12;
+const SPHERE_LAYOUT_RADIUS = 375;
+const MIN_NODE_DISTANCE = 14;
 const SPHEREIZE_BASE_BLEND = 0.22;
+const PARTIAL_SPHEREIZE_WEIGHT = 0.6;
 
 export class SemanticGraphView extends ItemView {
 	private settings: PluginSettings;
@@ -81,9 +83,18 @@ export class SemanticGraphView extends ItemView {
 	}
 
 	updateSettings(settings: PluginSettings): void {
+		const previous = this.settings;
 		this.settings = settings;
 		this.renderer?.setLinksVisible(this.settings.showLinks);
+		this.renderer?.updateVisualOptions(this.getVisualOptions());
 		this.updateLinksToggleButton();
+
+		if (
+			previous.sphereizeData !== settings.sphereizeData ||
+			previous.projectionMethod !== settings.projectionMethod
+		) {
+			void this.loadGraph();
+		}
 	}
 
 	private setStatus(text: string): void {
@@ -113,6 +124,25 @@ export class SemanticGraphView extends ItemView {
 		if (file) this.app.workspace.getLeaf(false).openFile(file as any);
 	}
 
+	private async reduceEmbeddings(vectors: number[][]): Promise<number[][]> {
+		if (this.settings.projectionMethod === "pca") {
+			this.setStatus("Running PCA...");
+			const reducer = new PcaReducer();
+			return reducer.reduce(vectors, (step, total) => {
+				this.setStatus(`PCA: ${step}/${total}`);
+			});
+		}
+
+		this.setStatus("Running UMAP...");
+		const reducer = new UmapReducer({
+			nNeighbors: this.settings.umapNNeighbors,
+			minDist: this.settings.umapMinDist,
+		});
+		return reducer.reduce(vectors, (epoch, total) => {
+			this.setStatus(`UMAP: ${epoch}/${total}`);
+		});
+	}
+
 	async loadGraph(): Promise<void> {
 		if (!this.graphStage || !this.inspector) return;
 
@@ -137,28 +167,26 @@ export class SemanticGraphView extends ItemView {
 					});
 
 					if (embeddings.size >= 3) {
-						this.setStatus("Running UMAP...");
 						const paths = Array.from(embeddings.keys());
 						const vectors = paths.map((p) => embeddings.get(p)!);
-
-						const reducer = new UmapReducer({
-							nNeighbors: this.settings.umapNNeighbors,
-							minDist: this.settings.umapMinDist,
-						});
-
-						const coords = await reducer.reduce(vectors, (epoch, total) => {
-							this.setStatus(`UMAP: ${epoch}/${total}`);
-						});
+						const coords = await this.reduceEmbeddings(vectors);
 
 						const semanticPositions = new Map<string, [number, number, number]>();
 						paths.forEach((p, i) => semanticPositions.set(p, coords[i] as [number, number, number]));
 
-						finalPositions = this.sphereizePositions(
-							graphData.nodes,
-							spherePositions,
-							semanticPositions,
-							SPHERE_LAYOUT_RADIUS
-						);
+						finalPositions = this.settings.sphereizeData
+							? this.sphereizePositions(
+								graphData.nodes,
+								spherePositions,
+								semanticPositions,
+								SPHERE_LAYOUT_RADIUS
+							)
+							: this.createSemanticLayout(
+								graphData.nodes,
+								spherePositions,
+								semanticPositions,
+								SPHERE_LAYOUT_RADIUS
+							);
 					} else {
 						this.setStatus("Using sphere layout...");
 					}
@@ -181,9 +209,9 @@ export class SemanticGraphView extends ItemView {
 				this.graphStage,
 				(node) => {
 					this.inspector?.setSelectedNode(node);
-					this.openNote(node.path);
 				},
-				(node) => this.inspector?.setHoveredNode(node)
+				(node) => this.openNote(node.path),
+				this.getVisualOptions()
 			);
 			this.renderer.render(graphData);
 			this.renderer.setLinksVisible(this.settings.showLinks);
@@ -239,6 +267,7 @@ export class SemanticGraphView extends ItemView {
 		targetRadius: number
 	): Map<string, [number, number, number]> {
 		const sphereized = new Map<string, [number, number, number]>();
+		const centeredPositions = new Map<string, [number, number, number]>();
 		const available = nodes
 			.map((node) => semanticPositions.get(node.path))
 			.filter((pos): pos is [number, number, number] => !!pos);
@@ -256,24 +285,31 @@ export class SemanticGraphView extends ItemView {
 		centroid[2] /= available.length;
 
 		for (const node of nodes) {
-			const spherePos = spherePositions.get(node.path) ?? [0, 0, targetRadius];
 			const semanticPos = semanticPositions.get(node.path);
-			if (!semanticPos) {
-				sphereized.set(node.path, [...spherePos]);
-				continue;
-			}
+			if (!semanticPos) continue;
 
-			const centered: [number, number, number] = [
+			centeredPositions.set(node.path, [
 				semanticPos[0] - centroid[0],
 				semanticPos[1] - centroid[1],
 				semanticPos[2] - centroid[2],
-			];
-			const length = this.vectorLength(centered);
+			]);
+		}
+
+		this.scalePositions(centeredPositions, targetRadius * 0.72);
+
+		for (const node of nodes) {
+			const spherePos = spherePositions.get(node.path) ?? [0, 0, targetRadius];
+			const centeredPos = centeredPositions.get(node.path);
+			if (!centeredPos) {
+				sphereized.set(node.path, [...spherePos]);
+				continue;
+			}
+			const length = this.vectorLength(centeredPos);
 
 			const semanticDirection: [number, number, number] =
 				length === 0
 					? [0, 0, 1]
-					: [centered[0] / length, centered[1] / length, centered[2] / length];
+					: [centeredPos[0] / length, centeredPos[1] / length, centeredPos[2] / length];
 
 			const sphereLength = this.vectorLength(spherePos);
 			const sphereDirection: [number, number, number] =
@@ -287,15 +323,65 @@ export class SemanticGraphView extends ItemView {
 				semanticDirection[2] * (1 - SPHEREIZE_BASE_BLEND) + sphereDirection[2] * SPHEREIZE_BASE_BLEND,
 			];
 			const blendedLength = this.vectorLength(blended) || 1;
-
-			sphereized.set(node.path, [
+			const sphereSurfacePos: [number, number, number] = [
 				(blended[0] / blendedLength) * targetRadius,
 				(blended[1] / blendedLength) * targetRadius,
 				(blended[2] / blendedLength) * targetRadius,
+			];
+
+			sphereized.set(node.path, [
+				centeredPos[0] * (1 - PARTIAL_SPHEREIZE_WEIGHT) + sphereSurfacePos[0] * PARTIAL_SPHEREIZE_WEIGHT,
+				centeredPos[1] * (1 - PARTIAL_SPHEREIZE_WEIGHT) + sphereSurfacePos[1] * PARTIAL_SPHEREIZE_WEIGHT,
+				centeredPos[2] * (1 - PARTIAL_SPHEREIZE_WEIGHT) + sphereSurfacePos[2] * PARTIAL_SPHEREIZE_WEIGHT,
 			]);
 		}
 
 		return sphereized;
+	}
+
+	private createSemanticLayout(
+		nodes: GraphNode[],
+		spherePositions: Map<string, [number, number, number]>,
+		semanticPositions: Map<string, [number, number, number]>,
+		targetRadius: number
+	): Map<string, [number, number, number]> {
+		const semanticLayout = new Map<string, [number, number, number]>();
+		const centeredPositions = new Map<string, [number, number, number]>();
+		const available = nodes
+			.map((node) => semanticPositions.get(node.path))
+			.filter((pos): pos is [number, number, number] => !!pos);
+
+		if (available.length === 0) return semanticLayout;
+
+		const centroid: [number, number, number] = [0, 0, 0];
+		for (const [x, y, z] of available) {
+			centroid[0] += x;
+			centroid[1] += y;
+			centroid[2] += z;
+		}
+		centroid[0] /= available.length;
+		centroid[1] /= available.length;
+		centroid[2] /= available.length;
+
+		for (const node of nodes) {
+			const semanticPos = semanticPositions.get(node.path);
+			if (!semanticPos) continue;
+
+			centeredPositions.set(node.path, [
+				semanticPos[0] - centroid[0],
+				semanticPos[1] - centroid[1],
+				semanticPos[2] - centroid[2],
+			]);
+		}
+
+		this.scalePositions(centeredPositions, targetRadius * 0.9);
+
+		for (const node of nodes) {
+			const centeredPos = centeredPositions.get(node.path);
+			semanticLayout.set(node.path, centeredPos ?? spherePositions.get(node.path) ?? [0, 0, 0]);
+		}
+
+		return semanticLayout;
 	}
 
 	private applyPositions(
@@ -328,6 +414,15 @@ export class SemanticGraphView extends ItemView {
 		}
 
 		return hash >>> 0;
+	}
+
+	private getVisualOptions(): GraphVisualOptions {
+		return {
+			sceneTheme: this.settings.sceneTheme,
+			nodeAssetMode: this.settings.nodeAssetMode,
+			nodeOpacity: this.settings.nodeOpacity,
+			dragSensitivity: this.settings.dragSensitivity,
+		};
 	}
 
 	/** Scale coordinates to fit within targetRange */
