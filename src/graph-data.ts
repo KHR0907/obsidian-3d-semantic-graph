@@ -2,22 +2,11 @@ import { App, TFile } from "obsidian";
 import { GraphData, GraphNode, GraphLink, PluginSettings } from "./types";
 
 const FOLDER_COLORS = [
-	"#6366f1", // indigo
-	"#ec4899", // pink
-	"#14b8a6", // teal
-	"#f59e0b", // amber
-	"#8b5cf6", // violet
-	"#ef4444", // red
-	"#22c55e", // green
-	"#3b82f6", // blue
-	"#f97316", // orange
-	"#06b6d4", // cyan
+	"#6366f1", "#ec4899", "#14b8a6", "#f59e0b", "#8b5cf6",
+	"#ef4444", "#22c55e", "#3b82f6", "#f97316", "#06b6d4",
 ];
 
-export function buildGraphData(
-	app: App,
-	settings: PluginSettings
-): GraphData {
+export function buildGraphData(app: App, settings: PluginSettings): GraphData {
 	const nodes: GraphNode[] = [];
 	const colorMap = new Map<string, string>();
 	let colorIndex = 0;
@@ -37,8 +26,7 @@ export function buildGraphData(
 			colorIndex++;
 		}
 
-		const stat = file.stat;
-		const size = Math.max(2, Math.min(8, Math.log2(stat.size / 100 + 1) + 2));
+		const size = Math.max(2, Math.min(8, Math.log2(file.stat.size / 100 + 1) + 2));
 
 		nodes.push({
 			id: file.path,
@@ -51,7 +39,6 @@ export function buildGraphData(
 		nodeSet.add(file.path);
 	}
 
-	// Build links from Obsidian's actual wiki-links
 	const links: GraphLink[] = [];
 	const resolvedLinks = app.metadataCache.resolvedLinks;
 	const seen = new Set<string>();
@@ -63,7 +50,7 @@ export function buildGraphData(
 			const key = [sourcePath, targetPath].sort().join("|");
 			if (seen.has(key)) continue;
 			seen.add(key);
-			links.push({ source: sourcePath, target: targetPath, similarity: 1 });
+			links.push({ source: sourcePath, target: targetPath });
 		}
 	}
 

@@ -40,19 +40,11 @@ export interface GraphNode {
 	fx?: number;
 	fy?: number;
 	fz?: number;
-	// UMAP semantic home positions (spring force target)
-	homeX?: number;
-	homeY?: number;
-	homeZ?: number;
-	// Folder node flag
-	isFolder?: boolean;
 }
 
 export interface GraphLink {
 	source: string;
 	target: string;
-	similarity: number;
-	isFolderLink?: boolean;
 }
 
 export interface GraphData {
