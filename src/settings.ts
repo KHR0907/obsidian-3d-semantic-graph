@@ -66,6 +66,18 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Show Links")
+			.setDesc("Display connection lines between nodes.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.showLinks)
+					.onChange(async (value) => {
+						this.plugin.settings.showLinks = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName("Exclude Folders")
 			.setDesc("Comma-separated list of folders to exclude from the graph.")
 			.addText((text) =>

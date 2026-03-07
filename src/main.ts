@@ -13,7 +13,11 @@ export default class SemanticGraphPlugin extends Plugin {
 			return new SemanticGraphView(
 				leaf,
 				this.settings,
-				this.manifest.dir!
+				this.manifest.dir!,
+				async (nextSettings: PluginSettings) => {
+					this.settings = nextSettings;
+					await this.saveSettings();
+				}
 			);
 		});
 

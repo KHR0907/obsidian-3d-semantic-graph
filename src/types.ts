@@ -4,6 +4,7 @@ export interface PluginSettings {
 	umapNNeighbors: number;
 	umapMinDist: number;
 	nodeColorBy: "folder" | "tag";
+	showLinks: boolean;
 	excludeFolders: string[];
 }
 
@@ -13,6 +14,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	umapNNeighbors: 15,
 	umapMinDist: 0.1,
 	nodeColorBy: "folder",
+	showLinks: true,
 	excludeFolders: [],
 };
 

@@ -29,6 +29,12 @@
 	background: var(--interactive-hover);
 }
 
+.semantic-graph-btn.is-active {
+	background: var(--interactive-accent);
+	border-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
 .semantic-graph-status {
 	font-size: 12px;
 	color: var(--text-muted);
@@ -37,12 +43,183 @@
 
 .semantic-graph-canvas {
 	flex: 1;
-	position: relative;
+	display: flex;
 	overflow: hidden;
 }
 
-.semantic-graph-canvas canvas {
+.semantic-graph-stage {
+	flex: 1;
+	min-width: 0;
+	position: relative;
+}
+
+.semantic-graph-inspector {
+	width: 320px;
+	flex-shrink: 0;
+	border-left: 1px solid var(--background-modifier-border);
+	background: color-mix(in srgb, var(--background-primary) 90%, black 10%);
+	overflow: auto;
+}
+
+.semantic-graph-inspector-panel {
+	padding: 18px 16px 20px;
+}
+
+.semantic-graph-inspector-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.semantic-graph-inspector-kicker {
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-faint);
+}
+
+.semantic-graph-inspector-status {
+	font-size: 11px;
+	color: var(--text-muted);
+}
+
+.semantic-graph-inspector-title {
+	margin-top: 12px;
+	font-size: 18px;
+	font-weight: 700;
+	line-height: 1.2;
+	color: var(--text-normal);
+}
+
+.semantic-graph-inspector-path {
+	margin-top: 8px;
+	font-size: 12px;
+	line-height: 1.45;
+	word-break: break-all;
+	color: var(--text-muted);
+}
+
+.semantic-graph-inspector-stats {
+	margin-top: 14px;
+	font-size: 12px;
+	color: var(--text-normal);
+}
+
+.semantic-graph-inspector-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 16px;
+}
+
+.semantic-graph-btn-small {
+	padding: 4px 10px;
+	font-size: 11px;
+}
+
+.semantic-graph-inspector-links-title {
+	margin-top: 22px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-faint);
+}
+
+.semantic-graph-inspector-links {
+	list-style: none;
+	padding: 0;
+	margin: 10px 0 0;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.semantic-graph-inspector-link-item {
+	padding-bottom: 10px;
+	border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 70%, transparent 30%);
+}
+
+.semantic-graph-inspector-link-btn {
 	display: block;
+	width: 100%;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	text-align: left;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-normal);
+	cursor: pointer;
+}
+
+.semantic-graph-inspector-link-btn:hover {
+	color: var(--interactive-accent);
+}
+
+.semantic-graph-inspector-link-path {
+	margin-top: 4px;
+	font-size: 11px;
+	line-height: 1.4;
+	word-break: break-all;
+	color: var(--text-faint);
+}
+
+.semantic-graph-scene-layer,
+.semantic-graph-overlay-layer {
+	position: absolute;
+	inset: 0;
+}
+
+.semantic-graph-overlay-layer {
+	pointer-events: none;
+}
+
+.semantic-graph-scene-layer canvas {
+	display: block;
+}
+
+.semantic-graph-hover-card {
+	position: absolute;
+	top: 16px;
+	left: 16px;
+	max-width: 320px;
+	padding: 12px 14px;
+	border: 1px solid color-mix(in srgb, var(--background-modifier-border) 70%, white 10%);
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--background-primary) 86%, black 14%);
+	backdrop-filter: blur(10px);
+	box-shadow: 0 12px 32px rgb(0 0 0 / 0.22);
+	opacity: 0;
+	transform: translateY(8px);
+	transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.semantic-graph-hover-card.is-visible {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.semantic-graph-hover-title {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.semantic-graph-hover-path {
+	margin-top: 4px;
+	font-size: 11px;
+	line-height: 1.4;
+	color: var(--text-muted);
+	word-break: break-all;
+}
+
+.semantic-graph-hover-meta {
+	margin-top: 10px;
+	font-size: 11px;
+	letter-spacing: 0.02em;
+	color: var(--text-faint);
 }
 
 .semantic-graph-error {
