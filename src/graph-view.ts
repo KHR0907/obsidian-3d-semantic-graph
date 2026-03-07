@@ -3,6 +3,7 @@ import { GraphNode, GraphVisualOptions, PluginSettings } from "./types";
 import { EmbeddingService } from "./embedding";
 import { GraphInspectorPanel } from "./graph-inspector";
 import { PcaReducer } from "./pca-reducer";
+import { createSeededRandom } from "./seeded-rng";
 import { UmapReducer } from "./umap-reducer";
 import { buildGraphData } from "./graph-data";
 import { GraphRenderer } from "./graph-renderer";
@@ -91,7 +92,8 @@ export class SemanticGraphView extends ItemView {
 
 		if (
 			previous.sphereizeData !== settings.sphereizeData ||
-			previous.projectionMethod !== settings.projectionMethod
+			previous.projectionMethod !== settings.projectionMethod ||
+			previous.layoutSeed !== settings.layoutSeed
 		) {
 			void this.loadGraph();
 		}
@@ -137,6 +139,7 @@ export class SemanticGraphView extends ItemView {
 		const reducer = new UmapReducer({
 			nNeighbors: this.settings.umapNNeighbors,
 			minDist: this.settings.umapMinDist,
+			seed: this.settings.layoutSeed,
 		});
 		return reducer.reduce(vectors, (epoch, total) => {
 			this.setStatus(`UMAP: ${epoch}/${total}`);
@@ -198,7 +201,11 @@ export class SemanticGraphView extends ItemView {
 				this.setStatus("Using sphere layout...");
 			}
 
-			this.enforceMinDistance(finalPositions, MIN_NODE_DISTANCE);
+			this.enforceMinDistance(
+				finalPositions,
+				MIN_NODE_DISTANCE,
+				createSeededRandom(this.settings.layoutSeed)
+			);
 			this.applyPositions(graphData.nodes, finalPositions);
 
 			this.setStatus(`${graphData.nodes.length} notes, ${graphData.links.length} links`);
@@ -458,6 +465,7 @@ export class SemanticGraphView extends ItemView {
 	private enforceMinDistance(
 		posMap: Map<string, [number, number, number]>,
 		minDist: number,
+		random: () => number,
 		maxIterations = 30
 	): void {
 		const entries = Array.from(posMap.entries());
@@ -481,9 +489,9 @@ export class SemanticGraphView extends ItemView {
 						b[2] += dz * push;
 						moved = true;
 					} else if (dist === 0) {
-						a[0] += (Math.random() - 0.5) * minDist;
-						a[1] += (Math.random() - 0.5) * minDist;
-						a[2] += (Math.random() - 0.5) * minDist;
+						a[0] += (random() - 0.5) * minDist;
+						a[1] += (random() - 0.5) * minDist;
+						a[2] += (random() - 0.5) * minDist;
 						moved = true;
 					}
 				}

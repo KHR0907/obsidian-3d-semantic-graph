@@ -1,8 +1,10 @@
 import { UMAP } from "umap-js";
+import { createSeededRandom } from "./seeded-rng";
 
 export interface UmapOptions {
 	nNeighbors: number;
 	minDist: number;
+	seed: number;
 }
 
 export class UmapReducer {
@@ -33,6 +35,7 @@ export class UmapReducer {
 		}
 
 		const nNeighbors = Math.min(this.options.nNeighbors, n - 1);
+		const random = createSeededRandom(this.options.seed);
 
 		const umap = new UMAP({
 			nComponents: 3,
@@ -40,6 +43,7 @@ export class UmapReducer {
 			minDist: this.options.minDist,
 			distanceFn: cosineDistance,
 			nEpochs: 200,
+			random,
 		});
 
 		umap.initializeFit(embeddings);

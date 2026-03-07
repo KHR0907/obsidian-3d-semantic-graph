@@ -80,6 +80,31 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Layout Seed")
+			.setDesc("Seed used for stochastic layout steps like UMAP and overlap resolution. Same seed gives the same layout more reliably.")
+			.addButton((button) =>
+				button
+					.setButtonText("Random")
+					.onClick(async () => {
+						const nextSeed = Math.floor(Math.random() * 2147483647);
+						this.plugin.settings.layoutSeed = nextSeed;
+						await this.plugin.saveSettings();
+						this.display();
+					})
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("12345")
+					.setValue(String(this.plugin.settings.layoutSeed))
+					.then((t) => (t.inputEl.type = "number"))
+					.onChange(async (value) => {
+						const parsed = Number.parseInt(value, 10);
+						this.plugin.settings.layoutSeed = Number.isFinite(parsed) ? parsed : DEFAULT_SETTINGS.layoutSeed;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName("Sphereize Data")
 			.setDesc("Project reduced embedding coordinates toward a sphere surface. Turn off to keep points distributed inside the 3D volume.")
 			.addToggle((toggle) =>

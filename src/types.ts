@@ -11,6 +11,7 @@ export interface PluginSettings {
 	nodeAssetMode: "3d" | "2d";
 	nodeOpacity: number;
 	dragSensitivity: number;
+	layoutSeed: number;
 	excludeFolders: string[];
 }
 
@@ -27,6 +28,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	nodeAssetMode: "3d",
 	nodeOpacity: 0.9,
 	dragSensitivity: 1,
+	layoutSeed: 12345,
 	excludeFolders: [],
 };
 
