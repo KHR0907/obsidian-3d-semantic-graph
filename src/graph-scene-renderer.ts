@@ -12,6 +12,7 @@ const CAMERA_BASE_HEIGHT_RATIO = 0.42;
 const CAMERA_WOBBLE_HEIGHT = 110;
 const SPHERE_SIZE_MULTIPLIER = 0.68;
 const MIN_GRID_DIVISIONS = 24;
+const RESET_VIEW_DURATION_MS = 1000;
 
 interface SceneThemePalette {
 	background: string;
@@ -55,6 +56,7 @@ export class GraphSceneRenderer {
 	private visualOptions: GraphVisualOptions;
 	private helperObjects: THREE.Object3D[] = [];
 	private autoRotateFrame: number | null = null;
+	private autoRotateResumeTimeout: number | null = null;
 	private autoRotateStart = 0;
 	private hasUserInteracted = false;
 	private readonly stopAutoRotateOnInteraction: EventListener;
@@ -105,6 +107,7 @@ export class GraphSceneRenderer {
 			});
 
 		this.applyControlSensitivity();
+		this.graph.cameraPosition(this.getInitialCameraPosition(), { x: 0, y: 0, z: 0 });
 		this.enableAutoRotate();
 		this.installSceneHelpers();
 		this.syncNodeAppearance();
@@ -117,8 +120,9 @@ export class GraphSceneRenderer {
 	resetView(): void {
 		if (this.graph) {
 			this.hasUserInteracted = false;
-			this.graph.cameraPosition(this.getDefaultCameraPosition(this.getResetCameraDistance()), { x: 0, y: 0, z: 0 }, 1000);
-			this.syncAutoRotate();
+			this.stopAutoRotate();
+			this.graph.cameraPosition(this.getInitialCameraPosition(), { x: 0, y: 0, z: 0 }, RESET_VIEW_DURATION_MS);
+			this.scheduleAutoRotateResume();
 		}
 	}
 
@@ -347,18 +351,15 @@ export class GraphSceneRenderer {
 		return this.getSceneExtent() * 1.35;
 	}
 
-	private getDefaultCameraPosition(distance: number): { x: number; y: number; z: number } {
-		const baseVector: [number, number, number] = [1, CAMERA_BASE_HEIGHT_RATIO, 1];
-		const length = Math.sqrt(
-			baseVector[0] * baseVector[0] +
-			baseVector[1] * baseVector[1] +
-			baseVector[2] * baseVector[2]
-		) || 1;
+	private getInitialCameraPosition(): { x: number; y: number; z: number } {
+		return this.getOrbitCameraPosition(AUTO_ROTATE_INITIAL_ANGLE, this.getResetCameraDistance());
+	}
 
+	private getOrbitCameraPosition(angle: number, orbitRadius: number): { x: number; y: number; z: number } {
 		return {
-			x: (baseVector[0] / length) * distance,
-			y: (baseVector[1] / length) * distance,
-			z: (baseVector[2] / length) * distance,
+			x: Math.cos(angle) * orbitRadius,
+			y: orbitRadius * CAMERA_BASE_HEIGHT_RATIO + Math.sin(angle * 0.4) * CAMERA_WOBBLE_HEIGHT,
+			z: Math.sin(angle) * orbitRadius,
 		};
 	}
 
@@ -367,6 +368,21 @@ export class GraphSceneRenderer {
 			window.cancelAnimationFrame(this.autoRotateFrame);
 			this.autoRotateFrame = null;
 		}
+		if (this.autoRotateResumeTimeout !== null) {
+			window.clearTimeout(this.autoRotateResumeTimeout);
+			this.autoRotateResumeTimeout = null;
+		}
+	}
+
+	private scheduleAutoRotateResume(): void {
+		if (this.hasUserInteracted || this.visualOptions.autoOrbitSpeed <= 0) return;
+		this.stopAutoRotate();
+		this.autoRotateResumeTimeout = window.setTimeout(() => {
+			this.autoRotateResumeTimeout = null;
+			if (!this.hasUserInteracted && this.visualOptions.autoOrbitSpeed > 0) {
+				this.enableAutoRotate();
+			}
+		}, RESET_VIEW_DURATION_MS);
 	}
 
 	private clearHelperObjects(): void {
