@@ -6,21 +6,24 @@ const BASE_LINK_OPACITY = 0.2;
 const DIMMED_LINK_OPACITY = 0.03;
 const HIGHLIGHT_LINK_OPACITY = 0.9;
 const DIMMED_NODE_OPACITY_FACTOR = 0.16;
-const AXES_LENGTH = 480;
-const RESET_CAMERA_Z = 900;
-const AUTO_ROTATE_SPEED = 0.00028;
-const AUTO_ROTATE_RADIUS = 900;
+const AUTO_ROTATE_BASE_SPEED = 0.00028;
 const AUTO_ROTATE_INITIAL_ANGLE = Math.PI / 4;
 const CAMERA_BASE_HEIGHT_RATIO = 0.42;
 const CAMERA_WOBBLE_HEIGHT = 110;
-const SPRITE_SIZE_MULTIPLIER = 6;
-const SPHERE_SIZE_MULTIPLIER = 0.9;
+const SPRITE_SIZE_MULTIPLIER = 4.6;
+const SPRITE_BORDER_SCALE = 1.28;
+const SPRITE_FILL_SCALE = 0.78;
+const SPHERE_SIZE_MULTIPLIER = 0.68;
+const MIN_GRID_DIVISIONS = 24;
 
 interface SceneThemePalette {
 	background: string;
 	baseLinkColor: string;
 	dimLinkColor: string;
 	highlightLinkColor: string;
+	gridColor: string;
+	gridCenterColor: string;
+	nodeOutlineColor: string;
 }
 
 const SCENE_THEMES: Record<GraphVisualOptions["sceneTheme"], SceneThemePalette> = {
@@ -29,12 +32,18 @@ const SCENE_THEMES: Record<GraphVisualOptions["sceneTheme"], SceneThemePalette> 
 		baseLinkColor: "#94a3b8",
 		dimLinkColor: "#334155",
 		highlightLinkColor: "#f8fafc",
+		gridColor: "#334155",
+		gridCenterColor: "#cbd5e1",
+		nodeOutlineColor: "#e2e8f0",
 	},
 	light: {
 		background: "#f8fafc",
 		baseLinkColor: "#64748b",
 		dimLinkColor: "#cbd5e1",
 		highlightLinkColor: "#0f172a",
+		gridColor: "#cbd5e1",
+		gridCenterColor: "#334155",
+		nodeOutlineColor: "#0f172a",
 	},
 };
 
@@ -114,7 +123,9 @@ export class GraphSceneRenderer {
 
 	resetView(): void {
 		if (this.graph) {
-			this.graph.cameraPosition(this.getDefaultCameraPosition(RESET_CAMERA_Z), { x: 0, y: 0, z: 0 }, 1000);
+			this.hasUserInteracted = false;
+			this.graph.cameraPosition(this.getDefaultCameraPosition(this.getResetCameraDistance()), { x: 0, y: 0, z: 0 }, 1000);
+			this.syncAutoRotate();
 		}
 	}
 
@@ -136,6 +147,7 @@ export class GraphSceneRenderer {
 		}
 
 		this.applyControlSensitivity();
+		this.syncAutoRotate();
 		this.graph.backgroundColor(this.getPalette().background);
 		this.installSceneHelpers();
 		this.syncNodeAppearance();
@@ -221,7 +233,7 @@ export class GraphSceneRenderer {
 	}
 
 	private createSphereNode(node: GraphNode): THREE.Mesh {
-		const geometry = new THREE.IcosahedronGeometry(Math.max(1.8, node.size * SPHERE_SIZE_MULTIPLIER), 2);
+		const geometry = new THREE.IcosahedronGeometry(Math.max(1.35, node.size * SPHERE_SIZE_MULTIPLIER), 2);
 		const material = new THREE.MeshStandardMaterial({
 			color: node.color,
 			roughness: 0.34,
@@ -232,18 +244,35 @@ export class GraphSceneRenderer {
 		return new THREE.Mesh(geometry, material);
 	}
 
-	private createSpriteNode(node: GraphNode): THREE.Sprite {
-		const material = new THREE.SpriteMaterial({
+	private createSpriteNode(node: GraphNode): THREE.Group {
+		const borderMaterial = new THREE.SpriteMaterial({
+			map: this.getSpriteTexture(),
+			color: this.getPalette().nodeOutlineColor,
+			transparent: true,
+			opacity: this.getNodeOpacity(node.path),
+			depthWrite: false,
+		});
+		const fillMaterial = new THREE.SpriteMaterial({
 			map: this.getSpriteTexture(),
 			color: node.color,
 			transparent: true,
 			opacity: this.getNodeOpacity(node.path),
 			depthWrite: false,
 		});
-		const sprite = new THREE.Sprite(material);
-		const size = Math.max(10, node.size * SPRITE_SIZE_MULTIPLIER);
-		sprite.scale.set(size, size, 1);
-		return sprite;
+		const size = Math.max(7, node.size * SPRITE_SIZE_MULTIPLIER);
+
+		const group = new THREE.Group();
+		const borderSprite = new THREE.Sprite(borderMaterial);
+		borderSprite.userData.kind = "border";
+		borderSprite.scale.set(size * SPRITE_BORDER_SCALE, size * SPRITE_BORDER_SCALE, 1);
+
+		const fillSprite = new THREE.Sprite(fillMaterial);
+		fillSprite.userData.kind = "fill";
+		fillSprite.scale.set(size * SPRITE_FILL_SCALE, size * SPRITE_FILL_SCALE, 1);
+
+		group.add(borderSprite);
+		group.add(fillSprite);
+		return group;
 	}
 
 	private getSpriteTexture(): THREE.Texture {
@@ -258,9 +287,10 @@ export class GraphSceneRenderer {
 			return this.spriteTexture;
 		}
 
-		const gradient = context.createRadialGradient(32, 32, 8, 32, 32, 28);
+		const gradient = context.createRadialGradient(32, 32, 6, 32, 32, 28);
 		gradient.addColorStop(0, "rgba(255,255,255,1)");
-		gradient.addColorStop(0.7, "rgba(255,255,255,0.95)");
+		gradient.addColorStop(0.78, "rgba(255,255,255,0.98)");
+		gradient.addColorStop(0.92, "rgba(255,255,255,0.9)");
 		gradient.addColorStop(1, "rgba(255,255,255,0)");
 		context.fillStyle = gradient;
 		context.beginPath();
@@ -278,13 +308,23 @@ export class GraphSceneRenderer {
 
 			const opacity = this.getNodeOpacity(path);
 			const color = this.getNodeColor(path, baseColor);
-			this.forEachMaterial(object, (material) => {
-				if ("color" in material) {
-					(material as THREE.MeshStandardMaterial | THREE.SpriteMaterial).color.set(color);
+			const outlineColor = this.getNodeOutlineColor(path);
+			object.traverse((child) => {
+				const resource = child as THREE.Object3D & {
+					material?: THREE.Material | THREE.Material[];
+					userData: { kind?: string };
+				};
+				if (!resource.material) return;
+				const materials = Array.isArray(resource.material) ? resource.material : [resource.material];
+				for (const material of materials) {
+					if ("color" in material) {
+						const nextColor = resource.userData.kind === "border" ? outlineColor : color;
+						(material as THREE.MeshStandardMaterial | THREE.SpriteMaterial).color.set(nextColor);
+					}
+					material.transparent = opacity < 1;
+					material.opacity = opacity;
+					material.needsUpdate = true;
 				}
-				material.transparent = opacity < 1;
-				material.opacity = opacity;
-				material.needsUpdate = true;
 			});
 		}
 	}
@@ -294,7 +334,8 @@ export class GraphSceneRenderer {
 
 		this.clearHelperObjects();
 		const scene = (this.graph as any).scene() as THREE.Scene;
-		const axes = new THREE.AxesHelper(AXES_LENGTH);
+		const palette = this.getPalette();
+		const axes = new THREE.AxesHelper(this.getAxesLength());
 		const axisMaterials = Array.isArray(axes.material) ? axes.material : [axes.material];
 		for (const material of axisMaterials) {
 			material.transparent = true;
@@ -302,10 +343,21 @@ export class GraphSceneRenderer {
 		}
 		scene.add(axes);
 		this.helperObjects.push(axes);
+
+		if (!this.visualOptions.showGrid) return;
+
+		const grid = new THREE.GridHelper(this.getGridSize(), this.getGridDivisions(), palette.gridCenterColor, palette.gridColor);
+		const gridMaterial = grid.material as THREE.Material & { opacity: number; transparent: boolean; depthWrite?: boolean };
+		gridMaterial.transparent = true;
+		gridMaterial.opacity = this.visualOptions.sceneTheme === "dark" ? 0.38 : 0.62;
+		gridMaterial.depthWrite = false;
+		grid.position.set(0, -1, 0);
+		scene.add(grid);
+		this.helperObjects.push(grid);
 	}
 
 	private enableAutoRotate(): void {
-		if (!this.graph || this.hasUserInteracted) return;
+		if (!this.graph || this.hasUserInteracted || this.visualOptions.autoOrbitSpeed <= 0) return;
 
 		this.stopAutoRotate();
 		this.autoRotateStart = performance.now();
@@ -314,14 +366,15 @@ export class GraphSceneRenderer {
 			if (!this.graph) return;
 
 			const elapsed = now - this.autoRotateStart;
-			const angle = AUTO_ROTATE_INITIAL_ANGLE + elapsed * AUTO_ROTATE_SPEED;
-			const y = AUTO_ROTATE_RADIUS * CAMERA_BASE_HEIGHT_RATIO + Math.sin(angle * 0.4) * CAMERA_WOBBLE_HEIGHT;
+			const angle = AUTO_ROTATE_INITIAL_ANGLE + elapsed * AUTO_ROTATE_BASE_SPEED * this.visualOptions.autoOrbitSpeed;
+			const orbitRadius = this.getAutoRotateRadius();
+			const y = orbitRadius * CAMERA_BASE_HEIGHT_RATIO + Math.sin(angle * 0.4) * CAMERA_WOBBLE_HEIGHT;
 
 			this.graph.cameraPosition(
 				{
-					x: Math.cos(angle) * AUTO_ROTATE_RADIUS,
+					x: Math.cos(angle) * orbitRadius,
 					y,
-					z: Math.sin(angle) * AUTO_ROTATE_RADIUS,
+					z: Math.sin(angle) * orbitRadius,
 				},
 				{ x: 0, y: 0, z: 0 }
 			);
@@ -330,6 +383,40 @@ export class GraphSceneRenderer {
 		};
 
 		this.autoRotateFrame = window.requestAnimationFrame(tick);
+	}
+
+	private syncAutoRotate(): void {
+		if (!this.graph) return;
+		if (this.hasUserInteracted || this.visualOptions.autoOrbitSpeed <= 0) {
+			this.stopAutoRotate();
+			return;
+		}
+
+		this.enableAutoRotate();
+	}
+
+	private getSceneExtent(): number {
+		return Math.max(960, this.visualOptions.sceneExtent);
+	}
+
+	private getAxesLength(): number {
+		return this.getSceneExtent() * 0.55;
+	}
+
+	private getGridSize(): number {
+		return this.getSceneExtent();
+	}
+
+	private getGridDivisions(): number {
+		return Math.max(MIN_GRID_DIVISIONS, Math.round(this.getSceneExtent() / 40));
+	}
+
+	private getResetCameraDistance(): number {
+		return this.getSceneExtent() * 1.35;
+	}
+
+	private getAutoRotateRadius(): number {
+		return this.getSceneExtent() * 1.35;
 	}
 
 	private getDefaultCameraPosition(distance: number): { x: number; y: number; z: number } {
@@ -391,22 +478,6 @@ export class GraphSceneRenderer {
 		});
 	}
 
-	private forEachMaterial(
-		object: THREE.Object3D,
-		callback: (material: THREE.Material & { opacity: number; transparent: boolean; needsUpdate: boolean }) => void
-	): void {
-		object.traverse((child) => {
-			const resource = child as THREE.Object3D & {
-				material?: THREE.Material | THREE.Material[];
-			};
-			if (!resource.material) return;
-			const materials = Array.isArray(resource.material) ? resource.material : [resource.material];
-			for (const material of materials) {
-				callback(material as THREE.Material & { opacity: number; transparent: boolean; needsUpdate: boolean });
-			}
-		});
-	}
-
 	private getNodeColor(path: string, baseColor: string): string {
 		if (!this.selectedNodePath) return baseColor;
 		return this.highlightedNodes.has(path)
@@ -419,6 +490,14 @@ export class GraphSceneRenderer {
 		return this.highlightedNodes.has(path)
 			? this.visualOptions.nodeOpacity
 			: Math.max(0.04, this.visualOptions.nodeOpacity * DIMMED_NODE_OPACITY_FACTOR);
+	}
+
+	private getNodeOutlineColor(path: string): string {
+		const outline = this.getPalette().nodeOutlineColor;
+		if (!this.selectedNodePath) return outline;
+		return this.highlightedNodes.has(path)
+			? outline
+			: this.mixColor(outline, this.visualOptions.sceneTheme === "dark" ? "#182338" : "#dbe4ef", 0.7);
 	}
 
 	private getLinkColor(link: GraphLink): string {

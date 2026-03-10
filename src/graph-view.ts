@@ -10,7 +10,8 @@ import { GraphRenderer } from "./graph-renderer";
 
 export const VIEW_TYPE = "semantic-graph-3d";
 
-const SPHERE_LAYOUT_RADIUS = 375;
+const MIN_SCENE_EXTENT = 960;
+const LAYOUT_RADIUS_RATIO = 0.45;
 const MIN_NODE_DISTANCE = 14;
 const SPHEREIZE_BASE_BLEND = 0.22;
 const PARTIAL_SPHEREIZE_WEIGHT = 0.6;
@@ -28,6 +29,7 @@ export class SemanticGraphView extends ItemView {
 	private inspectorContainer: HTMLElement | null = null;
 	private resizeObserver: ResizeObserver | null = null;
 	private linksToggleBtn: HTMLButtonElement | null = null;
+	private gridToggleBtn: HTMLButtonElement | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -57,7 +59,10 @@ export class SemanticGraphView extends ItemView {
 			.addEventListener("click", () => this.renderer?.resetView());
 		this.linksToggleBtn = this.toolbar.createEl("button", { cls: "semantic-graph-btn" });
 		this.linksToggleBtn.addEventListener("click", () => void this.toggleLinks());
+		this.gridToggleBtn = this.toolbar.createEl("button", { cls: "semantic-graph-btn" });
+		this.gridToggleBtn.addEventListener("click", () => void this.toggleGrid());
 		this.updateLinksToggleButton();
+		this.updateGridToggleButton();
 
 		this.statusEl = this.toolbar.createSpan({ cls: "semantic-graph-status" });
 		this.graphContainer = container.createDiv({ cls: "semantic-graph-canvas" });
@@ -68,6 +73,7 @@ export class SemanticGraphView extends ItemView {
 		this.resizeObserver = new ResizeObserver(() => {
 			if (this.renderer && this.graphStage) {
 				this.renderer.resize(this.graphStage.clientWidth, this.graphStage.clientHeight);
+				this.renderer.updateVisualOptions(this.getVisualOptions());
 			}
 		});
 		this.resizeObserver.observe(this.graphContainer);
@@ -89,6 +95,7 @@ export class SemanticGraphView extends ItemView {
 		this.renderer?.setLinksVisible(this.settings.showLinks);
 		this.renderer?.updateVisualOptions(this.getVisualOptions());
 		this.updateLinksToggleButton();
+		this.updateGridToggleButton();
 
 		if (
 			previous.sphereizeData !== settings.sphereizeData ||
@@ -110,6 +117,13 @@ export class SemanticGraphView extends ItemView {
 		this.linksToggleBtn.classList.toggle("is-active", this.settings.showLinks);
 	}
 
+	private updateGridToggleButton(): void {
+		if (!this.gridToggleBtn) return;
+
+		this.gridToggleBtn.setText(this.settings.showGrid ? "Grid On" : "Grid Off");
+		this.gridToggleBtn.classList.toggle("is-active", this.settings.showGrid);
+	}
+
 	private async toggleLinks(): Promise<void> {
 		this.settings = {
 			...this.settings,
@@ -118,6 +132,17 @@ export class SemanticGraphView extends ItemView {
 
 		this.renderer?.setLinksVisible(this.settings.showLinks);
 		this.updateLinksToggleButton();
+		await this.persistSettings(this.settings);
+	}
+
+	private async toggleGrid(): Promise<void> {
+		this.settings = {
+			...this.settings,
+			showGrid: !this.settings.showGrid,
+		};
+
+		this.renderer?.updateVisualOptions(this.getVisualOptions());
+		this.updateGridToggleButton();
 		await this.persistSettings(this.settings);
 	}
 
@@ -152,13 +177,14 @@ export class SemanticGraphView extends ItemView {
 		try {
 			this.setStatus("Building graph...");
 			const graphData = buildGraphData(this.app, this.settings);
+			const layoutRadius = this.getLayoutRadius();
 
 			if (graphData.nodes.length === 0) {
 				this.showError("No markdown files found in vault.");
 				return;
 			}
 
-			const spherePositions = this.createSphereLayout(graphData.nodes, SPHERE_LAYOUT_RADIUS);
+			const spherePositions = this.createSphereLayout(graphData.nodes, layoutRadius);
 			let finalPositions = spherePositions;
 
 			if (this.settings.openaiApiKey) {
@@ -182,13 +208,13 @@ export class SemanticGraphView extends ItemView {
 								graphData.nodes,
 								spherePositions,
 								semanticPositions,
-								SPHERE_LAYOUT_RADIUS
+								layoutRadius
 							)
 							: this.createSemanticLayout(
 								graphData.nodes,
 								spherePositions,
 								semanticPositions,
-								SPHERE_LAYOUT_RADIUS
+								layoutRadius
 							);
 					} else {
 						this.setStatus("Using sphere layout...");
@@ -429,7 +455,19 @@ export class SemanticGraphView extends ItemView {
 			nodeAssetMode: this.settings.nodeAssetMode,
 			nodeOpacity: this.settings.nodeOpacity,
 			dragSensitivity: this.settings.dragSensitivity,
+			showGrid: this.settings.showGrid,
+			autoOrbitSpeed: this.settings.autoOrbitSpeed,
+			sceneExtent: this.getSceneExtent(),
 		};
+	}
+
+	private getSceneExtent(): number {
+		if (!this.graphStage) return MIN_SCENE_EXTENT;
+		return Math.max(MIN_SCENE_EXTENT, this.graphStage.clientWidth, this.graphStage.clientHeight);
+	}
+
+	private getLayoutRadius(): number {
+		return this.getSceneExtent() * LAYOUT_RADIUS_RATIO;
 	}
 
 	/** Scale coordinates to fit within targetRange */

@@ -128,6 +128,18 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					})
 			);
 
+		new Setting(containerEl)
+			.setName("Show Grid")
+			.setDesc("Display a solid square grid on the XZ coordinate plane.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.showGrid)
+					.onChange(async (value) => {
+						this.plugin.settings.showGrid = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
 		containerEl.createEl("h3", { text: "Appearance" });
 
 		new Setting(containerEl)
@@ -182,6 +194,20 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setDynamicTooltip()
 					.onChange(async (value) => {
 						this.plugin.settings.dragSensitivity = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Auto Orbit Speed")
+			.setDesc("Adjust the idle camera orbit speed. Set to 0 to disable automatic camera movement.")
+			.addSlider((slider) =>
+				slider
+					.setLimits(0, 3, 0.1)
+					.setValue(this.plugin.settings.autoOrbitSpeed)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.autoOrbitSpeed = value;
 						await this.plugin.saveSettings();
 					})
 			);

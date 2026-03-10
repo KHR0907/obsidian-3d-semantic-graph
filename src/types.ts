@@ -7,10 +7,12 @@ export interface PluginSettings {
 	umapMinDist: number;
 	nodeColorBy: "folder" | "tag";
 	showLinks: boolean;
+	showGrid: boolean;
 	sceneTheme: "dark" | "light";
 	nodeAssetMode: "3d" | "2d";
 	nodeOpacity: number;
 	dragSensitivity: number;
+	autoOrbitSpeed: number;
 	layoutSeed: number;
 	excludeFolders: string[];
 }
@@ -24,10 +26,12 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	umapMinDist: 0.1,
 	nodeColorBy: "folder",
 	showLinks: true,
+	showGrid: true,
 	sceneTheme: "dark",
 	nodeAssetMode: "3d",
 	nodeOpacity: 0.9,
 	dragSensitivity: 1,
+	autoOrbitSpeed: 1,
 	layoutSeed: 12345,
 	excludeFolders: [],
 };
@@ -37,6 +41,9 @@ export interface GraphVisualOptions {
 	nodeAssetMode: "3d" | "2d";
 	nodeOpacity: number;
 	dragSensitivity: number;
+	showGrid: boolean;
+	autoOrbitSpeed: number;
+	sceneExtent: number;
 }
 
 export interface EmbeddingCacheEntry {
