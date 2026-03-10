@@ -1,10 +1,10 @@
 import { Plugin, WorkspaceLeaf } from "obsidian";
-import { DEFAULT_SETTINGS, PluginSettings } from "./types";
+import { createDefaultSettings, PluginSettings } from "./types";
 import { SemanticGraphSettingTab } from "./settings";
 import { SemanticGraphView, VIEW_TYPE } from "./graph-view";
 
 export default class SemanticGraphPlugin extends Plugin {
-	settings: PluginSettings = DEFAULT_SETTINGS;
+	settings: PluginSettings = createDefaultSettings();
 
 	async onload() {
 		await this.loadSettings();
@@ -41,7 +41,8 @@ export default class SemanticGraphPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.settings = Object.assign({}, createDefaultSettings(), await this.loadData());
+		delete (this.settings as PluginSettings & { nodeAssetMode?: unknown }).nodeAssetMode;
 	}
 
 	async saveSettings() {

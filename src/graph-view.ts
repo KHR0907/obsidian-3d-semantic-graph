@@ -90,7 +90,7 @@ export class SemanticGraphView extends ItemView {
 	}
 
 	updateSettings(settings: PluginSettings): void {
-		const previous = this.settings;
+		const previous = { ...this.settings };
 		this.settings = settings;
 		this.renderer?.setLinksVisible(this.settings.showLinks);
 		this.renderer?.updateVisualOptions(this.getVisualOptions());
@@ -452,8 +452,8 @@ export class SemanticGraphView extends ItemView {
 	private getVisualOptions(): GraphVisualOptions {
 		return {
 			sceneTheme: this.settings.sceneTheme,
-			nodeAssetMode: this.settings.nodeAssetMode,
 			nodeOpacity: this.settings.nodeOpacity,
+			nodeSizeScale: this.settings.nodeSizeScale,
 			dragSensitivity: this.settings.dragSensitivity,
 			showGrid: this.settings.showGrid,
 			autoOrbitSpeed: this.settings.autoOrbitSpeed,

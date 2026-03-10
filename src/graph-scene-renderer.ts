@@ -10,9 +10,6 @@ const AUTO_ROTATE_BASE_SPEED = 0.00028;
 const AUTO_ROTATE_INITIAL_ANGLE = Math.PI / 4;
 const CAMERA_BASE_HEIGHT_RATIO = 0.42;
 const CAMERA_WOBBLE_HEIGHT = 110;
-const SPRITE_SIZE_MULTIPLIER = 4.6;
-const SPRITE_BORDER_SCALE = 1.28;
-const SPRITE_FILL_SCALE = 0.78;
 const SPHERE_SIZE_MULTIPLIER = 0.68;
 const MIN_GRID_DIVISIONS = 24;
 
@@ -23,7 +20,6 @@ interface SceneThemePalette {
 	highlightLinkColor: string;
 	gridColor: string;
 	gridCenterColor: string;
-	nodeOutlineColor: string;
 }
 
 const SCENE_THEMES: Record<GraphVisualOptions["sceneTheme"], SceneThemePalette> = {
@@ -34,7 +30,6 @@ const SCENE_THEMES: Record<GraphVisualOptions["sceneTheme"], SceneThemePalette> 
 		highlightLinkColor: "#f8fafc",
 		gridColor: "#334155",
 		gridCenterColor: "#cbd5e1",
-		nodeOutlineColor: "#e2e8f0",
 	},
 	light: {
 		background: "#f8fafc",
@@ -43,7 +38,6 @@ const SCENE_THEMES: Record<GraphVisualOptions["sceneTheme"], SceneThemePalette> 
 		highlightLinkColor: "#0f172a",
 		gridColor: "#cbd5e1",
 		gridCenterColor: "#334155",
-		nodeOutlineColor: "#0f172a",
 	},
 };
 
@@ -60,7 +54,6 @@ export class GraphSceneRenderer {
 	private highlightedNodes = new Set<string>();
 	private visualOptions: GraphVisualOptions;
 	private helperObjects: THREE.Object3D[] = [];
-	private spriteTexture: THREE.Texture | null = null;
 	private autoRotateFrame: number | null = null;
 	private autoRotateStart = 0;
 	private hasUserInteracted = false;
@@ -135,12 +128,11 @@ export class GraphSceneRenderer {
 	}
 
 	updateVisualOptions(visualOptions: GraphVisualOptions): void {
-		const previousMode = this.visualOptions.nodeAssetMode;
+		const previous = this.visualOptions;
 		this.visualOptions = { ...visualOptions };
 
 		if (!this.graph) return;
-
-		if (previousMode !== visualOptions.nodeAssetMode && this.currentData) {
+		if (previous.nodeSizeScale !== this.visualOptions.nodeSizeScale && this.currentData) {
 			this.render(this.currentData);
 			this.setLinksVisible(this.linksVisible);
 			return;
@@ -160,8 +152,6 @@ export class GraphSceneRenderer {
 		this.container.removeEventListener("wheel", this.stopAutoRotateOnInteraction);
 		this.container.removeEventListener("touchstart", this.stopAutoRotateOnInteraction);
 		this.container.replaceChildren();
-		this.spriteTexture?.dispose();
-		this.spriteTexture = null;
 	}
 
 	private disposeGraph(): void {
@@ -222,10 +212,7 @@ export class GraphSceneRenderer {
 	}
 
 	private buildNodeObject(node: GraphNode): THREE.Object3D {
-		const object = this.visualOptions.nodeAssetMode === "2d"
-			? this.createSpriteNode(node)
-			: this.createSphereNode(node);
-
+		const object = this.createSphereNode(node);
 		object.userData.path = node.path;
 		object.userData.baseColor = node.color;
 		this.nodeObjects.set(node.path, object);
@@ -233,7 +220,8 @@ export class GraphSceneRenderer {
 	}
 
 	private createSphereNode(node: GraphNode): THREE.Mesh {
-		const geometry = new THREE.IcosahedronGeometry(Math.max(1.35, node.size * SPHERE_SIZE_MULTIPLIER), 2);
+		const radius = Math.max(1.5, node.size * SPHERE_SIZE_MULTIPLIER * this.visualOptions.nodeSizeScale);
+		const geometry = new THREE.IcosahedronGeometry(radius, 2);
 		const material = new THREE.MeshStandardMaterial({
 			color: node.color,
 			roughness: 0.34,
@@ -244,63 +232,6 @@ export class GraphSceneRenderer {
 		return new THREE.Mesh(geometry, material);
 	}
 
-	private createSpriteNode(node: GraphNode): THREE.Group {
-		const borderMaterial = new THREE.SpriteMaterial({
-			map: this.getSpriteTexture(),
-			color: this.getPalette().nodeOutlineColor,
-			transparent: true,
-			opacity: this.getNodeOpacity(node.path),
-			depthWrite: false,
-		});
-		const fillMaterial = new THREE.SpriteMaterial({
-			map: this.getSpriteTexture(),
-			color: node.color,
-			transparent: true,
-			opacity: this.getNodeOpacity(node.path),
-			depthWrite: false,
-		});
-		const size = Math.max(7, node.size * SPRITE_SIZE_MULTIPLIER);
-
-		const group = new THREE.Group();
-		const borderSprite = new THREE.Sprite(borderMaterial);
-		borderSprite.userData.kind = "border";
-		borderSprite.scale.set(size * SPRITE_BORDER_SCALE, size * SPRITE_BORDER_SCALE, 1);
-
-		const fillSprite = new THREE.Sprite(fillMaterial);
-		fillSprite.userData.kind = "fill";
-		fillSprite.scale.set(size * SPRITE_FILL_SCALE, size * SPRITE_FILL_SCALE, 1);
-
-		group.add(borderSprite);
-		group.add(fillSprite);
-		return group;
-	}
-
-	private getSpriteTexture(): THREE.Texture {
-		if (this.spriteTexture) return this.spriteTexture;
-
-		const canvas = document.createElement("canvas");
-		canvas.width = 64;
-		canvas.height = 64;
-		const context = canvas.getContext("2d");
-		if (!context) {
-			this.spriteTexture = new THREE.Texture();
-			return this.spriteTexture;
-		}
-
-		const gradient = context.createRadialGradient(32, 32, 6, 32, 32, 28);
-		gradient.addColorStop(0, "rgba(255,255,255,1)");
-		gradient.addColorStop(0.78, "rgba(255,255,255,0.98)");
-		gradient.addColorStop(0.92, "rgba(255,255,255,0.9)");
-		gradient.addColorStop(1, "rgba(255,255,255,0)");
-		context.fillStyle = gradient;
-		context.beginPath();
-		context.arc(32, 32, 28, 0, Math.PI * 2);
-		context.fill();
-
-		this.spriteTexture = new THREE.CanvasTexture(canvas);
-		return this.spriteTexture;
-	}
-
 	private syncNodeAppearance(): void {
 		for (const [path, object] of this.nodeObjects) {
 			const baseColor = object.userData.baseColor as string | undefined;
@@ -308,18 +239,15 @@ export class GraphSceneRenderer {
 
 			const opacity = this.getNodeOpacity(path);
 			const color = this.getNodeColor(path, baseColor);
-			const outlineColor = this.getNodeOutlineColor(path);
 			object.traverse((child) => {
 				const resource = child as THREE.Object3D & {
 					material?: THREE.Material | THREE.Material[];
-					userData: { kind?: string };
 				};
 				if (!resource.material) return;
 				const materials = Array.isArray(resource.material) ? resource.material : [resource.material];
 				for (const material of materials) {
 					if ("color" in material) {
-						const nextColor = resource.userData.kind === "border" ? outlineColor : color;
-						(material as THREE.MeshStandardMaterial | THREE.SpriteMaterial).color.set(nextColor);
+						(material as THREE.MeshStandardMaterial).color.set(color);
 					}
 					material.transparent = opacity < 1;
 					material.opacity = opacity;
@@ -490,14 +418,6 @@ export class GraphSceneRenderer {
 		return this.highlightedNodes.has(path)
 			? this.visualOptions.nodeOpacity
 			: Math.max(0.04, this.visualOptions.nodeOpacity * DIMMED_NODE_OPACITY_FACTOR);
-	}
-
-	private getNodeOutlineColor(path: string): string {
-		const outline = this.getPalette().nodeOutlineColor;
-		if (!this.selectedNodePath) return outline;
-		return this.highlightedNodes.has(path)
-			? outline
-			: this.mixColor(outline, this.visualOptions.sceneTheme === "dark" ? "#182338" : "#dbe4ef", 0.7);
 	}
 
 	private getLinkColor(link: GraphLink): string {

@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import SemanticGraphPlugin from "./main";
-import { DEFAULT_SETTINGS } from "./types";
+import { createDefaultSettings, generateRandomLayoutSeed } from "./types";
 
 export class SemanticGraphSettingTab extends PluginSettingTab {
 	plugin: SemanticGraphPlugin;
@@ -35,7 +35,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Embedding Model")
-			.setDesc("OpenAI embedding model to use.")
+			.setDesc("OpenAI embedding model to use. Default: text-embedding-3-large.")
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOption("text-embedding-3-small", "text-embedding-3-small (1536D, fast)")
@@ -53,7 +53,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Node Color By")
-			.setDesc("How to assign colors to nodes.")
+			.setDesc("How to assign colors to nodes. Default: Folder.")
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOption("folder", "Folder")
@@ -67,7 +67,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Projection Method")
-			.setDesc("Choose the algorithm used to project embeddings into 3D.")
+			.setDesc("Choose the algorithm used to project embeddings into 3D. Default: UMAP.")
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOption("umap", "UMAP")
@@ -81,12 +81,12 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Layout Seed")
-			.setDesc("Seed used for stochastic layout steps like UMAP and overlap resolution. Same seed gives the same layout more reliably.")
+			.setDesc("Seed used for stochastic layout steps like UMAP and overlap resolution. Same seed gives the same layout more reliably. Default: random.")
 			.addButton((button) =>
 				button
 					.setButtonText("Random")
 					.onClick(async () => {
-						const nextSeed = Math.floor(Math.random() * 2147483647);
+						const nextSeed = generateRandomLayoutSeed();
 						this.plugin.settings.layoutSeed = nextSeed;
 						await this.plugin.saveSettings();
 						this.display();
@@ -99,14 +99,14 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.then((t) => (t.inputEl.type = "number"))
 					.onChange(async (value) => {
 						const parsed = Number.parseInt(value, 10);
-						this.plugin.settings.layoutSeed = Number.isFinite(parsed) ? parsed : DEFAULT_SETTINGS.layoutSeed;
+						this.plugin.settings.layoutSeed = Number.isFinite(parsed) ? parsed : generateRandomLayoutSeed();
 						await this.plugin.saveSettings();
 					})
 			);
 
 		new Setting(containerEl)
 			.setName("Sphereize Data")
-			.setDesc("Project reduced embedding coordinates toward a sphere surface. Turn off to keep points distributed inside the 3D volume.")
+			.setDesc("Project reduced embedding coordinates toward a sphere surface. Turn off to keep points distributed inside the 3D volume. Default: Off.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.sphereizeData)
@@ -118,7 +118,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Show Links")
-			.setDesc("Display connection lines between nodes.")
+			.setDesc("Display connection lines between nodes. Default: Off.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.showLinks)
@@ -130,7 +130,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Show Grid")
-			.setDesc("Display a solid square grid on the XZ coordinate plane.")
+			.setDesc("Display a solid square grid on the XZ coordinate plane. Default: On.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.showGrid)
@@ -144,7 +144,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Scene Theme")
-			.setDesc("Choose the background style for the 3D stage.")
+			.setDesc("Choose the background style for the 3D stage. Default: Light.")
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOption("dark", "Dark")
@@ -157,22 +157,8 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Node Asset")
-			.setDesc("Render nodes as volumetric 3D meshes or billboarded 2D sprites.")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("3d", "3D Asset")
-					.addOption("2d", "2D Asset")
-					.setValue(this.plugin.settings.nodeAssetMode)
-					.onChange(async (value: "3d" | "2d") => {
-						this.plugin.settings.nodeAssetMode = value;
-						await this.plugin.saveSettings();
-					})
-			);
-
-		new Setting(containerEl)
 			.setName("Node Opacity")
-			.setDesc("Adjust node transparency.")
+			.setDesc("Adjust node transparency. Default: 1.0.")
 			.addSlider((slider) =>
 				slider
 					.setLimits(0.15, 1, 0.05)
@@ -185,8 +171,22 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Node Size")
+			.setDesc("Adjust the size of 3D nodes. Default: 1.5.")
+			.addSlider((slider) =>
+				slider
+					.setLimits(0.4, 2, 0.05)
+					.setValue(this.plugin.settings.nodeSizeScale)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.nodeSizeScale = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName("Drag Sensitivity")
-			.setDesc("Adjust how strongly the camera responds when dragging the graph.")
+			.setDesc("Adjust how strongly the camera responds when dragging the graph. Default: 1.0.")
 			.addSlider((slider) =>
 				slider
 					.setLimits(0.2, 3, 0.1)
@@ -200,7 +200,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Auto Orbit Speed")
-			.setDesc("Adjust the idle camera orbit speed. Set to 0 to disable automatic camera movement.")
+			.setDesc("Adjust the idle camera orbit speed. Set to 0 to disable automatic camera movement. Default: 0.2.")
 			.addSlider((slider) =>
 				slider
 					.setLimits(0, 3, 0.1)
@@ -233,7 +233,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Number of Neighbors")
-			.setDesc("Controls local vs global structure (5–50). Lower = tighter clusters, Higher = broader spread. Default: 15")
+			.setDesc("Controls local vs global structure (5-50). Lower = tighter clusters, higher = broader spread. Default: 30.")
 			.addSlider((slider) =>
 				slider
 					.setLimits(5, 50, 1)
@@ -247,7 +247,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Minimum Distance")
-			.setDesc("How tightly UMAP packs similar points (0.0–0.99). Lower = more clustered. Default: 0.1")
+			.setDesc("How tightly UMAP packs similar points (0.0-0.99). Lower = more clustered. Default: 0.80.")
 			.addSlider((slider) =>
 				slider
 					.setLimits(0, 0.99, 0.01)
@@ -271,7 +271,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setWarning()
 					.onClick(async () => {
 						const apiKey = this.plugin.settings.openaiApiKey;
-						this.plugin.settings = { ...DEFAULT_SETTINGS, openaiApiKey: apiKey };
+						this.plugin.settings = { ...createDefaultSettings(), openaiApiKey: apiKey };
 						await this.plugin.saveSettings();
 						this.display();
 					})

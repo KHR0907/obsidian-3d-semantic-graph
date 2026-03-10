@@ -9,37 +9,45 @@ export interface PluginSettings {
 	showLinks: boolean;
 	showGrid: boolean;
 	sceneTheme: "dark" | "light";
-	nodeAssetMode: "3d" | "2d";
 	nodeOpacity: number;
+	nodeSizeScale: number;
 	dragSensitivity: number;
 	autoOrbitSpeed: number;
 	layoutSeed: number;
 	excludeFolders: string[];
 }
 
-export const DEFAULT_SETTINGS: PluginSettings = {
-	openaiApiKey: "",
-	embeddingModel: "text-embedding-3-small",
-	projectionMethod: "umap",
-	sphereizeData: true,
-	umapNNeighbors: 15,
-	umapMinDist: 0.1,
-	nodeColorBy: "folder",
-	showLinks: true,
-	showGrid: true,
-	sceneTheme: "dark",
-	nodeAssetMode: "3d",
-	nodeOpacity: 0.9,
-	dragSensitivity: 1,
-	autoOrbitSpeed: 1,
-	layoutSeed: 12345,
-	excludeFolders: [],
-};
+export function generateRandomLayoutSeed(): number {
+	return Math.floor(Math.random() * 2147483647);
+}
+
+export function createDefaultSettings(): PluginSettings {
+	return {
+		openaiApiKey: "",
+		embeddingModel: "text-embedding-3-large",
+		projectionMethod: "umap",
+		sphereizeData: false,
+		umapNNeighbors: 30,
+		umapMinDist: 0.8,
+		nodeColorBy: "folder",
+		showLinks: false,
+		showGrid: true,
+		sceneTheme: "light",
+		nodeOpacity: 1,
+		nodeSizeScale: 1.5,
+		dragSensitivity: 1,
+		autoOrbitSpeed: 0.2,
+		layoutSeed: generateRandomLayoutSeed(),
+		excludeFolders: [],
+	};
+}
+
+export const DEFAULT_SETTINGS: PluginSettings = createDefaultSettings();
 
 export interface GraphVisualOptions {
 	sceneTheme: "dark" | "light";
-	nodeAssetMode: "3d" | "2d";
 	nodeOpacity: number;
+	nodeSizeScale: number;
 	dragSensitivity: number;
 	showGrid: boolean;
 	autoOrbitSpeed: number;
