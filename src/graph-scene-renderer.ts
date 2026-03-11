@@ -13,6 +13,16 @@ const CAMERA_WOBBLE_HEIGHT = 110;
 const SPHERE_SIZE_MULTIPLIER = 0.68;
 const MIN_GRID_DIVISIONS = 24;
 const RESET_VIEW_DURATION_MS = 1000;
+const ORIGIN = new THREE.Vector3(0, 0, 0);
+const INITIAL_CAMERA_UP = new THREE.Vector3(0, 1, 0);
+
+interface SceneControls {
+	enabled?: boolean;
+	target?: THREE.Vector3;
+	rotateSpeed?: number;
+	update?: () => void;
+	saveState?: () => void;
+}
 
 interface SceneThemePalette {
 	background: string;
@@ -57,6 +67,7 @@ export class GraphSceneRenderer {
 	private helperObjects: THREE.Object3D[] = [];
 	private autoRotateFrame: number | null = null;
 	private autoRotateResumeTimeout: number | null = null;
+	private resetViewSyncTimeout: number | null = null;
 	private autoRotateStart = 0;
 	private hasUserInteracted = false;
 	private readonly stopAutoRotateOnInteraction: EventListener;
@@ -73,6 +84,7 @@ export class GraphSceneRenderer {
 		this.visualOptions = { ...visualOptions };
 		this.stopAutoRotateOnInteraction = () => {
 			this.hasUserInteracted = true;
+			this.clearResetViewSyncTimeout();
 			this.stopAutoRotate();
 		};
 		this.container.addEventListener("pointerdown", this.stopAutoRotateOnInteraction, { passive: true });
@@ -107,7 +119,7 @@ export class GraphSceneRenderer {
 			});
 
 		this.applyControlSensitivity();
-		this.graph.cameraPosition(this.getInitialCameraPosition(), { x: 0, y: 0, z: 0 });
+		this.applyCameraViewState(this.getInitialCameraPosition(), true);
 		this.enableAutoRotate();
 		this.installSceneHelpers();
 		this.syncNodeAppearance();
@@ -120,8 +132,14 @@ export class GraphSceneRenderer {
 	resetView(): void {
 		if (this.graph) {
 			this.hasUserInteracted = false;
+			this.clearResetViewSyncTimeout();
 			this.stopAutoRotate();
-			this.graph.cameraPosition(this.getInitialCameraPosition(), { x: 0, y: 0, z: 0 }, RESET_VIEW_DURATION_MS);
+			const initialCameraPosition = this.getInitialCameraPosition();
+			this.graph.cameraPosition(initialCameraPosition, ORIGIN, RESET_VIEW_DURATION_MS);
+			this.resetViewSyncTimeout = window.setTimeout(() => {
+				this.resetViewSyncTimeout = null;
+				this.applyCameraViewState(initialCameraPosition, true);
+			}, RESET_VIEW_DURATION_MS);
 			this.scheduleAutoRotateResume();
 		}
 	}
@@ -160,6 +178,7 @@ export class GraphSceneRenderer {
 
 	private disposeGraph(): void {
 		this.stopAutoRotate();
+		this.clearResetViewSyncTimeout();
 		this.clearHelperObjects();
 		this.disposeNodeObjects();
 
@@ -459,15 +478,49 @@ export class GraphSceneRenderer {
 	}
 
 	private applyControlSensitivity(): void {
-		if (!this.graph) return;
-
-		const controls = this.graph.controls() as {
-			rotateSpeed?: number;
-			update?: () => void;
-		};
-
+		const controls = this.getControls();
+		if (!controls) return;
 		controls.rotateSpeed = this.visualOptions.dragSensitivity;
 		controls.update?.();
+	}
+
+	private applyCameraViewState(
+		cameraPosition: { x: number; y: number; z: number },
+		persistAsResetState = false
+	): void {
+		if (!this.graph) return;
+
+		const camera = this.graph.camera() as THREE.Camera & {
+			position: THREE.Vector3;
+			up: THREE.Vector3;
+			updateProjectionMatrix?: () => void;
+			lookAt: (target: THREE.Vector3) => void;
+		};
+		const controls = this.getControls();
+
+		camera.position.set(cameraPosition.x, cameraPosition.y, cameraPosition.z);
+		camera.up.copy(INITIAL_CAMERA_UP);
+		camera.lookAt(ORIGIN);
+		camera.updateProjectionMatrix?.();
+
+		if (controls?.target) {
+			controls.target.copy(ORIGIN);
+		}
+		controls?.update?.();
+		if (persistAsResetState) {
+			controls?.saveState?.();
+		}
+	}
+
+	private getControls(): SceneControls | null {
+		return this.graph ? this.graph.controls() as SceneControls : null;
+	}
+
+	private clearResetViewSyncTimeout(): void {
+		if (this.resetViewSyncTimeout !== null) {
+			window.clearTimeout(this.resetViewSyncTimeout);
+			this.resetViewSyncTimeout = null;
+		}
 	}
 
 	private getNodePath(nodeRef: string | GraphNode): string | null {
