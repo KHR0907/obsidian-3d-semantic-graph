@@ -1,55 +1,99 @@
 # Obsidian 3D Semantic Graph
 
-一款 Obsidian 插件，使用 OpenAI 嵌入向量对笔记进行语义分析，并在 3D 空间中可视化，语义相似的笔记在空间中距离更近。
+这是一个仅支持 Obsidian 桌面版的插件。配置 OpenAI API Key 后，插件会为笔记内容生成嵌入向量，再通过 UMAP 或 PCA 投影到 3D 空间，让语义接近的笔记彼此更靠近。没有 API Key 时，会回退到确定性的球形布局。
 
 [English](./README.md) | [한국어](./README_KO.md) | [日本語](./README_JA.md)
 
 ## 功能
 
-- **基于语义的 3D 可视化**：使用 OpenAI 嵌入（text-embedding-3-small）分析笔记间的语义相似度，通过 UMAP 投影到 3D 空间
-- **交互操作**：点击节点→打开笔记，悬停→显示标题，拖拽→旋转，滚动→缩放
-- **嵌入缓存**：仅重新嵌入已更改的笔记，节省 API 费用
-- **自定义设置**：相似度阈值、UMAP 参数、节点颜色方案（文件夹/标签）、文件夹排除
+- 基于 OpenAI 嵌入的语义 3D 布局
+- 使用 UMAP 或 PCA 生成 3D 坐标
+- 支持种子控制的可复现布局，以及可选的 sphereize 效果
+- 基于 Obsidian 实际笔记链接的连线显示
+- Inspector 面板可查看当前选中笔记及其连接笔记
+- 亮色/暗色场景主题、网格开关、自动旋转、重置视角
+- 按文件夹或第一个标签为节点着色
+- 对未变化笔记复用的嵌入缓存
+- 同时作用于图数据和嵌入生成的排除文件夹设置
+
+## 工作流程
+
+1. 插件读取 vault 中未被排除的 markdown 文件。
+2. 每篇笔记会成为一个节点，节点之间的连线来自 Obsidian 的 resolved links。
+3. 如果配置了 OpenAI API Key，插件会清洗正文、生成嵌入、写入缓存，并用选定的方法投影到 3D。
+4. 如果没有 API Key，或者嵌入步骤失败，则使用球形布局。
 
 ## 安装
 
-1. 克隆仓库并构建：
-   ```bash
-   git clone https://github.com/your-repo/obsidian-3d-semantic-graph.git
-   cd obsidian-3d-semantic-graph
-   npm install
-   npm run build
-   ```
+### 从源码构建
 
-2. 将 `main.js`、`manifest.json`、`styles.css` 复制到 vault 的 `.obsidian/plugins/obsidian-3d-semantic-graph/` 目录
+```bash
+git clone <repository-url>
+cd obsidian-3d-semantic-graph
+npm install
+npm run build
+```
 
-3. 重启 Obsidian → 设置 → 第三方插件 → 启用 "3D Semantic Graph"
+构建完成后，将 `main.js`、`manifest.json`、`styles.css` 复制到：
+
+```text
+<your-vault>/.obsidian/plugins/obsidian-3d-semantic-graph/
+```
+
+然后重启 Obsidian，并在 **Settings > Community plugins** 中启用 **3D Semantic Graph**。
+
+## 开发
+
+```bash
+npm run dev
+npm run build
+```
+
+仓库中还包含 `scripts/deploy-to-vault.ps1`，这是一个把构建产物复制到指定本地 vault 路径的辅助脚本。
 
 ## 使用方法
 
-1. 设置 → 3D Semantic Graph → 输入 OpenAI API 密钥
-2. 点击侧边栏图标（网络图标）或在命令面板中运行 **Open 3D Semantic Graph**
-3. 笔记将以语义聚类的形式显示在 3D 空间中
+1. 打开 **Settings > 3D Semantic Graph**。
+2. 如需启用语义布局，填写 OpenAI API Key。
+3. 通过功能区图标或 **Open 3D Semantic Graph** 命令打开视图。
+4. 可以在工具栏中刷新图谱、重置相机，以及切换连线和网格显示。
+5. 点击节点会将其固定到 Inspector 中，按住 `Shift` 点击节点，或使用 Inspector 按钮，可以直接打开笔记。
 
 ## 设置项
 
 | 设置 | 说明 | 默认值 |
-|------|------|--------|
-| API Key | OpenAI API 密钥 | - |
-| Embedding Model | 嵌入模型 | text-embedding-3-small |
-| Similarity Threshold | 创建链接的最小余弦相似度（0.5–0.95） | 0.7 |
-| Node Color By | 节点着色依据（文件夹/标签） | Folder |
-| UMAP nNeighbors | 局部结构保留程度（5–50） | 15 |
-| UMAP minDist | 聚类密度（0.0–0.99） | 0.1 |
-| Exclude Folders | 排除的文件夹（逗号分隔） | - |
+| --- | --- | --- |
+| API Key | OpenAI API Key。留空时仅使用球形布局 | 空 |
+| Embedding Model | 语义布局使用的 OpenAI 嵌入模型 | `text-embedding-3-large` |
+| Projection Method | 生成 3D 坐标的降维方法 | `umap` |
+| Layout Seed | UMAP 和节点避让使用的随机种子 | 随机 |
+| Sphereize Data | 将语义坐标部分混合到球面方向 | `false` |
+| Node Color By | 按文件夹或第一个标签着色 | `folder` |
+| Show Links | 是否显示笔记之间的连线 | `false` |
+| Show Grid | 是否显示 XZ 平面网格 | `true` |
+| Scene Theme | 场景背景主题 | `light` |
+| Node Opacity | 节点透明度 | `1.0` |
+| Node Size | 节点尺寸倍率 | `1.5` |
+| Drag Sensitivity | 相机拖拽旋转灵敏度 | `1.0` |
+| Auto Orbit Speed | 空闲时自动旋转速度，设为 `0` 可关闭 | `0.2` |
+| Exclude Folders | 要排除的文件夹列表（逗号分隔） | 空 |
+| Number of Neighbors | UMAP 的局部/全局平衡参数 | `30` |
+| Minimum Distance | UMAP 的聚类距离参数 | `0.80` |
+
+## 嵌入缓存
+
+- 缓存文件：`embeddings-cache.json`
+- 保存位置：插件目录
+- 当嵌入模型或笔记内容变化时会自动失效
 
 ## 技术栈
 
-- **3d-force-graph**（基于 Three.js）— 3D 图形渲染
-- **umap-js** — 高维嵌入降维至 3D
-- **OpenAI API** — 直接使用 `fetch()` 调用（不使用 SDK，减小包体积）
-- **esbuild** — Obsidian 官方推荐的打包工具
+- `3d-force-graph`
+- `three`
+- `umap-js`
+- `esbuild`
+- 嵌入请求通过 Obsidian `requestUrl` API 发出
 
-## 许可证
+## License
 
 MIT
