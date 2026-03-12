@@ -19,5 +19,3 @@ data.json
 
 # Local deployment helpers
 scripts/deploy-to-vault.ps1
-GLOSSARY.md
-SESSION_NOTE.md
