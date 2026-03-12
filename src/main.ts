@@ -1,5 +1,10 @@
 import { Plugin, WorkspaceLeaf } from "obsidian";
-import { createDefaultSettings, PluginSettings } from "./types";
+import {
+	createDefaultSettings,
+	EmbeddingProvider,
+	isPresetEmbeddingModel,
+	PluginSettings,
+} from "./types";
 import { SemanticGraphSettingTab } from "./settings";
 import { SemanticGraphView, VIEW_TYPE } from "./graph-view";
 
@@ -41,8 +46,49 @@ export default class SemanticGraphPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, createDefaultSettings(), await this.loadData());
-		delete (this.settings as PluginSettings & { nodeAssetMode?: unknown }).nodeAssetMode;
+		const loaded = await this.loadData() as Partial<PluginSettings> & {
+			nodeAssetMode?: unknown;
+			openaiApiKey?: unknown;
+			embeddingProvider?: unknown;
+			embeddingApiKey?: unknown;
+			embeddingModel?: unknown;
+			useCustomEmbeddingModel?: unknown;
+			customEmbeddingModel?: unknown;
+			customEmbeddingEndpoint?: unknown;
+		};
+		this.settings = Object.assign({}, createDefaultSettings(), loaded);
+
+		if (typeof loaded.openaiApiKey === "string" && !this.settings.embeddingApiKey) {
+			this.settings.embeddingApiKey = loaded.openaiApiKey;
+		}
+
+		const provider = loaded.embeddingProvider;
+		if (provider !== "openai" && provider !== "gemini" && provider !== "cohere" && provider !== "voyage" && provider !== "custom") {
+			this.settings.embeddingProvider = "openai";
+		}
+
+		if (this.settings.embeddingProvider === "custom") {
+			this.settings.embeddingProvider = "openai";
+			this.settings.embeddingModel = "text-embedding-3-large";
+			this.settings.useCustomEmbeddingModel = false;
+		}
+
+		if (
+			typeof loaded.embeddingModel === "string" &&
+			typeof loaded.useCustomEmbeddingModel !== "boolean" &&
+			typeof loaded.customEmbeddingModel !== "string"
+		) {
+			if (isPresetEmbeddingModel(this.settings.embeddingProvider as EmbeddingProvider, loaded.embeddingModel)) {
+				this.settings.embeddingModel = loaded.embeddingModel;
+			} else {
+				this.settings.embeddingProvider = "openai";
+				this.settings.embeddingModel = "text-embedding-3-large";
+				this.settings.useCustomEmbeddingModel = false;
+			}
+		}
+
+		delete (this.settings as PluginSettings & { nodeAssetMode?: unknown; openaiApiKey?: unknown }).nodeAssetMode;
+		delete (this.settings as PluginSettings & { nodeAssetMode?: unknown; openaiApiKey?: unknown }).openaiApiKey;
 	}
 
 	async saveSettings() {

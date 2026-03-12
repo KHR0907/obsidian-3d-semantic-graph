@@ -1,11 +1,12 @@
 import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
-import { GraphNode, GraphVisualOptions, PluginSettings } from "./types";
+import { canGenerateEmbeddings, GraphNode, GraphVisualOptions, PluginSettings } from "./types";
 import { EmbeddingService } from "./embedding";
 import { PcaReducer } from "./pca-reducer";
 import { createSeededRandom } from "./seeded-rng";
 import { UmapReducer } from "./umap-reducer";
 import { buildGraphData } from "./graph-data";
 import { GraphRenderer } from "./graph-renderer";
+import { readUploadedVectors } from "./uploaded-vectors";
 
 export const VIEW_TYPE = "semantic-graph-3d";
 
@@ -180,13 +181,11 @@ export class SemanticGraphView extends ItemView {
 			const spherePositions = this.createSphereLayout(graphData.nodes, layoutRadius);
 			let finalPositions = spherePositions;
 
-			if (this.settings.openaiApiKey) {
+			if (canGenerateEmbeddings(this.settings)) {
 				try {
-					this.setStatus("Generating embeddings...");
-					const embeddingService = new EmbeddingService(this.app, this.settings, this.pluginDir);
-					const embeddings = await embeddingService.getEmbeddings((current, total) => {
-						this.setStatus(`Embedding... ${current}/${total}`);
-					});
+					const embeddings = this.settings.uploadedVectorsFileName.trim()
+						? await this.loadUploadedEmbeddingVectors()
+						: await this.loadProviderEmbeddings();
 
 					if (embeddings.size >= 3) {
 						const paths = Array.from(embeddings.keys());
@@ -244,6 +243,19 @@ export class SemanticGraphView extends ItemView {
 			this.showError(`Error: ${msg}`);
 			new Notice(`3D Semantic Graph: ${msg}`);
 		}
+	}
+
+	private async loadProviderEmbeddings(): Promise<Map<string, number[]>> {
+		this.setStatus("Generating embeddings...");
+		const embeddingService = new EmbeddingService(this.app, this.settings, this.pluginDir);
+		return embeddingService.getEmbeddings((current, total) => {
+			this.setStatus(`Embedding... ${current}/${total}`);
+		});
+	}
+
+	private async loadUploadedEmbeddingVectors(): Promise<Map<string, number[]>> {
+		this.setStatus("Loading uploaded vectors...");
+		return readUploadedVectors(this.app, this.pluginDir);
 	}
 
 	private createSphereLayout(

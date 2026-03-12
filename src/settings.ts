@@ -1,6 +1,12 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import SemanticGraphPlugin from "./main";
-import { createDefaultSettings, generateRandomLayoutSeed } from "./types";
+import {
+	createDefaultSettings,
+	EMBEDDING_PROVIDER_LABELS,
+	generateRandomLayoutSeed,
+	PRESET_EMBEDDING_MODELS,
+} from "./types";
+import { UPLOADED_VECTORS_FILE } from "./uploaded-vectors";
 
 export class SemanticGraphSettingTab extends PluginSettingTab {
 	plugin: SemanticGraphPlugin;
@@ -17,34 +23,63 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 		containerEl.createEl("h2", { text: "3D Semantic Graph Settings" });
 
 		// --- API Settings ---
-		containerEl.createEl("h3", { text: "OpenAI API" });
-
+		containerEl.createEl("h3", { text: "Embedding API" });
 		new Setting(containerEl)
 			.setName("API Key")
-			.setDesc("OpenAI API key for generating embeddings. Leave empty to use sphere layout without semantic positioning.")
+			.setDesc("API key for generating embeddings. Leave empty to use sphere layout without semantic positioning.")
 			.addText((text) =>
 				text
 					.setPlaceholder("sk-...")
-					.setValue(this.plugin.settings.openaiApiKey)
+					.setValue(this.plugin.settings.embeddingApiKey)
 					.then((t) => (t.inputEl.type = "password"))
 					.onChange(async (value) => {
-						this.plugin.settings.openaiApiKey = value.trim();
+						this.plugin.settings.embeddingApiKey = value.trim();
 						await this.plugin.saveSettings();
 					})
 			);
 
 		new Setting(containerEl)
 			.setName("Embedding Model")
-			.setDesc("OpenAI embedding model to use. Default: text-embedding-3-large.")
+			.setDesc("Choose an OpenAI embedding model.")
 			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("text-embedding-3-small", "text-embedding-3-small (1536D, fast)")
-					.addOption("text-embedding-3-large", "text-embedding-3-large (3072D, accurate)")
-					.addOption("text-embedding-ada-002", "text-embedding-ada-002 (legacy)")
-					.setValue(this.plugin.settings.embeddingModel)
+				this.addProviderModelOptions(dropdown)
+					.setValue(this.getSelectedEmbeddingOptionValue())
 					.onChange(async (value) => {
-						this.plugin.settings.embeddingModel = value;
+						const { provider, model } = this.parseEmbeddingOptionValue(value);
+						this.plugin.settings.embeddingProvider = provider;
+						this.plugin.settings.embeddingModel = model;
+						this.plugin.settings.useCustomEmbeddingModel = false;
 						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Custom Vector JSON")
+			.setDesc("Use uploaded vectors instead of API embeddings.")
+			.addButton((button) =>
+				button
+					.setButtonText("Example")
+					.onClick(() => this.downloadExampleJson())
+			)
+			.addButton((button) =>
+				button
+					.setButtonText(this.plugin.settings.uploadedVectorsFileName ? "Upload Again" : "Upload")
+					.onClick(() => void this.uploadVectorsJson())
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("upload_file_name.json")
+					.setValue(this.plugin.settings.uploadedVectorsFileName)
+					.setDisabled(true)
+			)
+			.addExtraButton((button) =>
+				button
+					.setIcon("cross")
+					.setTooltip("Clear uploaded vectors reference")
+					.onClick(async () => {
+						this.plugin.settings.uploadedVectorsFileName = "";
+						await this.plugin.saveSettings();
+						this.display();
 					})
 			);
 
@@ -270,11 +305,97 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setButtonText("Reset")
 					.setWarning()
 					.onClick(async () => {
-						const apiKey = this.plugin.settings.openaiApiKey;
-						this.plugin.settings = { ...createDefaultSettings(), openaiApiKey: apiKey };
+						const apiKey = this.plugin.settings.embeddingApiKey;
+						this.plugin.settings = { ...createDefaultSettings(), embeddingApiKey: apiKey };
 						await this.plugin.saveSettings();
 						this.display();
 					})
 			);
+	}
+
+	private addProviderModelOptions(dropdown: import("obsidian").DropdownComponent) {
+		PRESET_EMBEDDING_MODELS.openai.forEach((model) => {
+			dropdown.addOption(this.toEmbeddingOptionValue("openai", model), `${EMBEDDING_PROVIDER_LABELS.openai} - ${model}`);
+		});
+		return dropdown;
+	}
+
+	private getSelectedEmbeddingOptionValue(): string {
+		const model = PRESET_EMBEDDING_MODELS.openai.includes(this.plugin.settings.embeddingModel)
+			? this.plugin.settings.embeddingModel
+			: PRESET_EMBEDDING_MODELS.openai[0];
+		return this.toEmbeddingOptionValue("openai", model);
+	}
+
+	private toEmbeddingOptionValue(
+		provider: Exclude<typeof this.plugin.settings.embeddingProvider, "custom">,
+		model: string
+	): string {
+		return `${provider}::${model}`;
+	}
+
+	private parseEmbeddingOptionValue(value: string): {
+		provider: Exclude<typeof this.plugin.settings.embeddingProvider, "custom">;
+		model: string;
+	} {
+		const [provider, ...modelParts] = value.split("::");
+		return {
+			provider: provider as Exclude<typeof this.plugin.settings.embeddingProvider, "custom">,
+			model: modelParts.join("::"),
+		};
+	}
+
+	private async uploadVectorsJson(): Promise<void> {
+		const input = document.createElement("input");
+		input.type = "file";
+		input.accept = "application/json,.json";
+		input.onchange = async () => {
+			const file = input.files?.[0];
+			if (!file) return;
+			try {
+				const raw = await file.text();
+				JSON.parse(raw);
+				const path = `${this.plugin.manifest.dir}/${UPLOADED_VECTORS_FILE}`;
+				await this.app.vault.adapter.write(path, raw);
+				this.plugin.settings.uploadedVectorsFileName = file.name;
+				await this.plugin.saveSettings();
+				this.display();
+				new Notice("Uploaded vectors JSON saved.");
+			} catch (error) {
+				new Notice(`Failed to upload vectors JSON: ${error instanceof Error ? error.message : String(error)}`);
+			}
+		};
+		input.click();
+	}
+
+	private downloadExampleJson(): void {
+		const blob = new Blob([this.getUploadedVectorsExampleJson()], { type: "application/json" });
+		const url = URL.createObjectURL(blob);
+		const anchor = document.createElement("a");
+		anchor.href = url;
+		anchor.download = "vectors-example.json";
+		anchor.click();
+		URL.revokeObjectURL(url);
+		new Notice("Example JSON downloaded.");
+	}
+
+	private getUploadedVectorsExampleJson(): string {
+		return JSON.stringify(
+			{
+				entries: {
+					"folder/note-a.md": {
+						embedding: [0.12, -0.48, 0.91],
+					},
+					"folder/note-b.md": {
+						embedding: [-0.33, 0.27, 0.54],
+					},
+					"folder/note-c.md": {
+						embedding: [0.78, 0.11, -0.22],
+					},
+				},
+			},
+			null,
+			2
+		);
 	}
 }
