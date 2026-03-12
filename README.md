@@ -10,7 +10,6 @@ Desktop-only Obsidian plugin that places your notes in a 3D scene. With an OpenA
 - UMAP or PCA projection for 3D layout generation
 - Deterministic layout seeding and optional sphereized semantic layout
 - Real note links from Obsidian resolved links, with toolbar toggle
-- Inspector panel for selected notes and connected notes
 - Light and dark scene themes, optional grid, auto orbit, and reset view
 - Node coloring by folder or first tag
 - Embedding cache that reuses unchanged note vectors
@@ -21,7 +20,8 @@ Desktop-only Obsidian plugin that places your notes in a 3D scene. With an OpenA
 1. The plugin loads markdown files from your vault, excluding any folders listed in settings.
 2. Nodes are created from note files, and links are built from Obsidian's resolved note links.
 3. If an OpenAI API key is configured, note text is cleaned, embedded, cached, and reduced to 3D with the selected projection method.
-4. If no API key is configured, or embedding fails, the graph falls back to a sphere layout.
+4. If no API key is configured, or embedding fails, the graph falls back to a deterministic sphere layout.
+5. In sphere layout mode, notes are distributed throughout a 3D sphere using a stable hash-based ordering and golden-angle spacing, so the fallback stays reproducible across reloads but is not semantic.
 
 ## Installation
 
@@ -57,13 +57,13 @@ The repository also includes `scripts/deploy-to-vault.ps1`, which is a local hel
 2. Optionally enter an OpenAI API key to enable semantic positioning.
 3. Open the graph from the ribbon icon or the **Open 3D Semantic Graph** command.
 4. Use the toolbar to refresh the graph, reset the camera, and toggle links or grid visibility.
-5. Click a node to pin it in the inspector. Shift-click a node, or use the inspector button, to open the note.
+5. Shift-click a node to open the note directly.
 
 ## Settings
 
 | Setting | Description | Default |
 | --- | --- | --- |
-| API Key | OpenAI API key. Leave empty to use sphere layout only. | Empty |
+| API Key | OpenAI API key. Leave empty to use the deterministic sphere-layout fallback instead of semantic embeddings. | Empty |
 | Embedding Model | OpenAI embedding model for semantic layout. | `text-embedding-3-large` |
 | Projection Method | Dimensionality reduction method for 3D coordinates. | `umap` |
 | Layout Seed | Seed for UMAP and overlap resolution. | Random |

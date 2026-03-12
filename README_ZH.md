@@ -10,7 +10,6 @@
 - 使用 UMAP 或 PCA 生成 3D 坐标
 - 支持种子控制的可复现布局，以及可选的 sphereize 效果
 - 基于 Obsidian 实际笔记链接的连线显示
-- Inspector 面板可查看当前选中笔记及其连接笔记
 - 亮色/暗色场景主题、网格开关、自动旋转、重置视角
 - 按文件夹或第一个标签为节点着色
 - 对未变化笔记复用的嵌入缓存
@@ -21,7 +20,8 @@
 1. 插件读取 vault 中未被排除的 markdown 文件。
 2. 每篇笔记会成为一个节点，节点之间的连线来自 Obsidian 的 resolved links。
 3. 如果配置了 OpenAI API Key，插件会清洗正文、生成嵌入、写入缓存，并用选定的方法投影到 3D。
-4. 如果没有 API Key，或者嵌入步骤失败，则使用球形布局。
+4. 如果没有 API Key，或者嵌入步骤失败，则使用确定性的球形布局。
+5. 在球形布局模式下，节点会按照基于路径哈希的稳定顺序和 golden-angle 间隔分布在 3D 球体内部，因此刷新后仍可复现，但这不是语义布局。
 
 ## 安装
 
@@ -57,13 +57,13 @@ npm run build
 2. 如需启用语义布局，填写 OpenAI API Key。
 3. 通过功能区图标或 **Open 3D Semantic Graph** 命令打开视图。
 4. 可以在工具栏中刷新图谱、重置相机，以及切换连线和网格显示。
-5. 点击节点会将其固定到 Inspector 中，按住 `Shift` 点击节点，或使用 Inspector 按钮，可以直接打开笔记。
+5. 按住 `Shift` 点击节点可以直接打开笔记。
 
 ## 设置项
 
 | 设置 | 说明 | 默认值 |
 | --- | --- | --- |
-| API Key | OpenAI API Key。留空时仅使用球形布局 | 空 |
+| API Key | OpenAI API Key。留空时将使用确定性的球形布局 fallback，而不是语义嵌入布局 | 空 |
 | Embedding Model | 语义布局使用的 OpenAI 嵌入模型 | `text-embedding-3-large` |
 | Projection Method | 生成 3D 坐标的降维方法 | `umap` |
 | Layout Seed | UMAP 和节点避让使用的随机种子 | 随机 |
