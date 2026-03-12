@@ -2,7 +2,7 @@
 
 Obsidian 데스크톱 전용 플러그인입니다. OpenAI API 키를 설정하면 노트 내용을 임베딩한 뒤 UMAP 또는 PCA로 3차원 좌표로 투영해 의미적으로 가까운 노트가 서로 가깝게 배치됩니다. 플러그인 안에서 임베딩을 만들지 않고, 직접 준비한 벡터 JSON 파일을 업로드해서 사용할 수도 있습니다. 둘 다 없으면 결정적인 구형 레이아웃으로 동작합니다.
 
-[English](./README.md) | [日本語](./README_JA.md) | [中文](./README_ZH.md)
+[English](../README.md) | [日本語](./README_JA.md) | [中文](./README_ZH.md)
 
 ## 주요 기능
 

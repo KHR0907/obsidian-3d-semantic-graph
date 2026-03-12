@@ -2,7 +2,7 @@
 
 Desktop-only Obsidian plugin that places your notes in a 3D scene. With an OpenAI API key, the plugin generates embeddings for note content and projects them into 3D with UMAP or PCA so semantically related notes appear closer together. You can also upload your own vector JSON file instead of generating embeddings inside the plugin. Without either one, it falls back to a deterministic sphere layout.
 
-[한국어](./README_KO.md) | [日本語](./README_JA.md) | [中文](./README_ZH.md)
+[한국어](./docs/README_KO.md) | [日本語](./docs/README_JA.md) | [中文](./docs/README_ZH.md)
 
 ## Features
 

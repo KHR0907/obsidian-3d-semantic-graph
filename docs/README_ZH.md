@@ -2,7 +2,7 @@
 
 这是一个仅支持 Obsidian 桌面版的插件。配置 OpenAI API Key 后，插件会为笔记内容生成嵌入向量，再通过 UMAP 或 PCA 投影到 3D 空间，让语义接近的笔记彼此更靠近。你也可以不在插件内生成嵌入，而是上传自己准备好的向量 JSON 文件来驱动布局。两者都没有时，会回退到确定性的球形布局。
 
-[English](./README.md) | [한국어](./README_KO.md) | [日本語](./README_JA.md)
+[English](../README.md) | [한국어](./README_KO.md) | [日本語](./README_JA.md)
 
 ## 功能
 
