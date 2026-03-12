@@ -51,8 +51,6 @@ npm run dev
 npm run build
 ```
 
-The repository also includes `scripts/deploy-to-vault.ps1`, which is a local helper script for copying build artifacts into a specific vault path.
-
 ## Usage
 
 1. Open **Settings > 3D Semantic Graph**.

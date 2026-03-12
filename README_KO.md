@@ -51,8 +51,6 @@ npm run dev
 npm run build
 ```
 
-저장소에는 특정 로컬 vault 경로로 산출물을 복사하는 `scripts/deploy-to-vault.ps1` 스크립트도 포함되어 있습니다.
-
 ## 사용 방법
 
 1. **설정 > 3D Semantic Graph**를 엽니다.

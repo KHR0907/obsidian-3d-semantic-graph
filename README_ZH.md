@@ -51,8 +51,6 @@ npm run dev
 npm run build
 ```
 
-仓库中还包含 `scripts/deploy-to-vault.ps1`，这是一个把构建产物复制到指定本地 vault 路径的辅助脚本。
-
 ## 使用方法
 
 1. 打开 **Settings > 3D Semantic Graph**。

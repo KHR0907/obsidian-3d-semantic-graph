@@ -5,8 +5,7 @@
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
-		"build": "node esbuild.config.mjs production",
-		"deploy:vault": "powershell -ExecutionPolicy Bypass -File scripts/deploy-to-vault.ps1"
+		"build": "node esbuild.config.mjs production"
 	},
 	"keywords": [],
 	"author": "",
