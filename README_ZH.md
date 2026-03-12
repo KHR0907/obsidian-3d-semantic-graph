@@ -1,12 +1,13 @@
 # Obsidian 3D Semantic Graph
 
-这是一个仅支持 Obsidian 桌面版的插件。配置 OpenAI API Key 后，插件会为笔记内容生成嵌入向量，再通过 UMAP 或 PCA 投影到 3D 空间，让语义接近的笔记彼此更靠近。没有 API Key 时，会回退到确定性的球形布局。
+这是一个仅支持 Obsidian 桌面版的插件。配置 OpenAI API Key 后，插件会为笔记内容生成嵌入向量，再通过 UMAP 或 PCA 投影到 3D 空间，让语义接近的笔记彼此更靠近。你也可以不在插件内生成嵌入，而是上传自己准备好的向量 JSON 文件来驱动布局。两者都没有时，会回退到确定性的球形布局。
 
 [English](./README.md) | [한국어](./README_KO.md) | [日本語](./README_JA.md)
 
 ## 功能
 
 - 基于 OpenAI 嵌入的语义 3D 布局
+- 可上传自定义向量 JSON，并覆盖 API 生成的嵌入
 - 使用 UMAP 或 PCA 生成 3D 坐标
 - 支持种子控制的可复现布局，以及可选的 sphereize 效果
 - 基于 Obsidian 实际笔记链接的连线显示
@@ -19,9 +20,10 @@
 
 1. 插件读取 vault 中未被排除的 markdown 文件。
 2. 每篇笔记会成为一个节点，节点之间的连线来自 Obsidian 的 resolved links。
-3. 如果配置了 OpenAI API Key，插件会清洗正文、生成嵌入、写入缓存，并用选定的方法投影到 3D。
-4. 如果没有 API Key，或者嵌入步骤失败，则使用确定性的球形布局。
-5. 在球形布局模式下，节点会按照基于路径哈希的稳定顺序和 golden-angle 间隔分布在 3D 球体内部，因此刷新后仍可复现，但这不是语义布局。
+3. 如果已上传自定义向量 JSON，插件会直接使用这些向量来计算 3D 坐标。
+4. 否则，如果配置了 OpenAI API Key，插件会清洗正文、生成嵌入、写入缓存，并用选定的方法投影到 3D。
+5. 如果既没有上传向量 JSON，也没有 API Key，或者嵌入步骤失败，则使用确定性的球形布局。
+6. 在球形布局模式下，节点会按照基于路径哈希的稳定顺序和 golden-angle 间隔分布在 3D 球体内部，因此刷新后仍可复现，但这不是语义布局。
 
 ## 安装
 
@@ -29,7 +31,7 @@
 
 ```bash
 git clone <repository-url>
-cd obsidian-3d-semantic-graph
+cd <repository-directory>
 npm install
 npm run build
 ```
@@ -54,17 +56,19 @@ npm run build
 ## 使用方法
 
 1. 打开 **Settings > 3D Semantic Graph**。
-2. 如需启用语义布局，填写 OpenAI API Key。
-3. 通过功能区图标或 **Open 3D Semantic Graph** 命令打开视图。
-4. 可以在工具栏中刷新图谱、重置相机，以及切换连线和网格显示。
-5. 按住 `Shift` 点击节点可以直接打开笔记。
+2. 填写 OpenAI API Key 并选择嵌入模型，或者上传自定义向量 JSON 文件。
+3. 如果两者都存在，上传的向量 JSON 会优先于 API 生成的嵌入。
+4. 通过功能区图标或 **Open 3D Semantic Graph** 命令打开视图。
+5. 可以在工具栏中刷新图谱、重置相机，以及切换连线和网格显示。
+6. 按住 `Shift` 点击节点可以直接打开笔记。
 
 ## 设置项
 
 | 设置 | 说明 | 默认值 |
 | --- | --- | --- |
-| API Key | OpenAI API Key。留空时将使用确定性的球形布局 fallback，而不是语义嵌入布局 | 空 |
+| API Key | OpenAI API Key。使用上传向量时可以留空；如果两者都没有，则使用球形布局 fallback | 空 |
 | Embedding Model | 语义布局使用的 OpenAI 嵌入模型 | `text-embedding-3-large` |
+| Custom Vector JSON | 上传预先计算好的向量 JSON 文件。存在时会覆盖 API 生成的嵌入。 | 空 |
 | Projection Method | 生成 3D 坐标的降维方法 | `umap` |
 | Layout Seed | UMAP 和节点避让使用的随机种子 | 随机 |
 | Sphereize Data | 将语义坐标部分混合到球面方向 | `false` |
@@ -85,6 +89,27 @@ npm run build
 - 缓存文件：`embeddings-cache.json`
 - 保存位置：插件目录
 - 当嵌入模型或笔记内容变化时会自动失效
+
+## 自定义向量 JSON 格式
+
+上传的向量 JSON 使用以下格式：
+
+```json
+{
+  "entries": {
+    "folder/note-a.md": {
+      "embedding": [0.12, -0.48, 0.91]
+    },
+    "folder/note-b.md": {
+      "embedding": [-0.33, 0.27, 0.54]
+    }
+  }
+}
+```
+
+- `entries` 中的键必须与 vault 内笔记路径一致。
+- 每个 `embedding` 都必须是数字数组。
+- 上传后的文件会以 `uploaded-vectors.json` 保存在插件目录中。
 
 ## 技术栈
 
