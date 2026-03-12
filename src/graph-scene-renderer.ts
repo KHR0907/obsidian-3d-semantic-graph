@@ -24,6 +24,12 @@ interface SceneControls {
 	saveState?: () => void;
 }
 
+interface CameraViewState {
+	position: THREE.Vector3;
+	target: THREE.Vector3;
+	up: THREE.Vector3;
+}
+
 interface SceneThemePalette {
 	background: string;
 	baseLinkColor: string;
@@ -67,9 +73,10 @@ export class GraphSceneRenderer {
 	private helperObjects: THREE.Object3D[] = [];
 	private autoRotateFrame: number | null = null;
 	private autoRotateResumeTimeout: number | null = null;
-	private resetViewSyncTimeout: number | null = null;
+	private resetViewAnimationFrame: number | null = null;
 	private autoRotateStart = 0;
 	private hasUserInteracted = false;
+	private initialCameraState: CameraViewState | null = null;
 	private readonly stopAutoRotateOnInteraction: EventListener;
 
 	constructor(
@@ -84,7 +91,7 @@ export class GraphSceneRenderer {
 		this.visualOptions = { ...visualOptions };
 		this.stopAutoRotateOnInteraction = () => {
 			this.hasUserInteracted = true;
-			this.clearResetViewSyncTimeout();
+			this.stopResetViewAnimation();
 			this.stopAutoRotate();
 		};
 		this.container.addEventListener("pointerdown", this.stopAutoRotateOnInteraction, { passive: true });
@@ -119,7 +126,8 @@ export class GraphSceneRenderer {
 			});
 
 		this.applyControlSensitivity();
-		this.applyCameraViewState(this.getInitialCameraPosition(), true);
+		this.initialCameraState = this.getInitialCameraState();
+		this.applyCameraViewState(this.initialCameraState, true);
 		this.enableAutoRotate();
 		this.installSceneHelpers();
 		this.syncNodeAppearance();
@@ -132,15 +140,26 @@ export class GraphSceneRenderer {
 	resetView(): void {
 		if (this.graph) {
 			this.hasUserInteracted = false;
-			this.clearResetViewSyncTimeout();
+			this.stopResetViewAnimation();
 			this.stopAutoRotate();
-			const initialCameraPosition = this.getInitialCameraPosition();
-			this.graph.cameraPosition(initialCameraPosition, ORIGIN, RESET_VIEW_DURATION_MS);
-			this.resetViewSyncTimeout = window.setTimeout(() => {
-				this.resetViewSyncTimeout = null;
-				this.applyCameraViewState(initialCameraPosition, true);
-			}, RESET_VIEW_DURATION_MS);
-			this.scheduleAutoRotateResume();
+			const initialCameraState = this.getInitialCameraState();
+			this.initialCameraState = this.cloneCameraViewState(initialCameraState);
+			const currentCameraState = this.getCurrentCameraState();
+			if (!currentCameraState) {
+				this.applyCameraViewState(initialCameraState, true);
+				this.scheduleAutoRotateResume();
+				return;
+			}
+
+			this.animateCameraViewState(
+				currentCameraState,
+				initialCameraState,
+				RESET_VIEW_DURATION_MS,
+				true,
+				() => {
+					this.scheduleAutoRotateResume();
+				}
+			);
 		}
 	}
 
@@ -152,6 +171,7 @@ export class GraphSceneRenderer {
 	updateVisualOptions(visualOptions: GraphVisualOptions): void {
 		const previous = this.visualOptions;
 		this.visualOptions = { ...visualOptions };
+		this.initialCameraState = this.getInitialCameraState();
 
 		if (!this.graph) return;
 		if (previous.nodeSizeScale !== this.visualOptions.nodeSizeScale && this.currentData) {
@@ -178,7 +198,7 @@ export class GraphSceneRenderer {
 
 	private disposeGraph(): void {
 		this.stopAutoRotate();
-		this.clearResetViewSyncTimeout();
+		this.stopResetViewAnimation();
 		this.clearHelperObjects();
 		this.disposeNodeObjects();
 
@@ -318,17 +338,8 @@ export class GraphSceneRenderer {
 
 			const elapsed = now - this.autoRotateStart;
 			const angle = AUTO_ROTATE_INITIAL_ANGLE + elapsed * AUTO_ROTATE_BASE_SPEED * this.visualOptions.autoOrbitSpeed;
-			const orbitRadius = this.getAutoRotateRadius();
-			const y = orbitRadius * CAMERA_BASE_HEIGHT_RATIO + Math.sin(angle * 0.4) * CAMERA_WOBBLE_HEIGHT;
-
-			this.graph.cameraPosition(
-				{
-					x: Math.cos(angle) * orbitRadius,
-					y,
-					z: Math.sin(angle) * orbitRadius,
-				},
-				{ x: 0, y: 0, z: 0 }
-			);
+			const cameraState = this.getOrbitCameraViewState(angle, this.getAutoRotateRadius());
+			this.applyCameraViewState(cameraState);
 
 			this.autoRotateFrame = window.requestAnimationFrame(tick);
 		};
@@ -370,8 +381,17 @@ export class GraphSceneRenderer {
 		return this.getSceneExtent() * 1.35;
 	}
 
-	private getInitialCameraPosition(): { x: number; y: number; z: number } {
-		return this.getOrbitCameraPosition(AUTO_ROTATE_INITIAL_ANGLE, this.getResetCameraDistance());
+	private getInitialCameraState(): CameraViewState {
+		return this.getOrbitCameraViewState(AUTO_ROTATE_INITIAL_ANGLE, this.getResetCameraDistance());
+	}
+
+	private getOrbitCameraViewState(angle: number, orbitRadius: number): CameraViewState {
+		const position = this.getOrbitCameraPosition(angle, orbitRadius);
+		return {
+			position: new THREE.Vector3(position.x, position.y, position.z),
+			target: ORIGIN.clone(),
+			up: INITIAL_CAMERA_UP.clone(),
+		};
 	}
 
 	private getOrbitCameraPosition(angle: number, orbitRadius: number): { x: number; y: number; z: number } {
@@ -390,6 +410,82 @@ export class GraphSceneRenderer {
 		if (this.autoRotateResumeTimeout !== null) {
 			window.clearTimeout(this.autoRotateResumeTimeout);
 			this.autoRotateResumeTimeout = null;
+		}
+	}
+
+	private getCurrentCameraState(): CameraViewState | null {
+		if (!this.graph) return null;
+
+		const camera = this.graph.camera() as THREE.Camera & {
+			position: THREE.Vector3;
+		};
+		const controls = this.getControls();
+		return {
+			position: camera.position.clone(),
+			target: controls?.target?.clone() ?? ORIGIN.clone(),
+			up: camera.up.clone(),
+		};
+	}
+
+	private animateCameraViewState(
+		from: CameraViewState,
+		to: CameraViewState,
+		durationMs: number,
+		persistFinalState = false,
+		onComplete?: () => void
+	): void {
+		if (!this.graph) return;
+
+		const controls = this.getControls();
+		if (controls) {
+			controls.enabled = false;
+		}
+
+		if (durationMs <= 0) {
+			this.applyCameraViewState(to, persistFinalState);
+			if (controls) {
+				controls.enabled = true;
+			}
+			onComplete?.();
+			return;
+		}
+
+		const startTime = performance.now();
+		const tick = (now: number) => {
+			if (!this.graph) return;
+
+			const progress = Math.min(1, (now - startTime) / durationMs);
+			const easedProgress = this.easeInOutCubic(progress);
+			const position = from.position.clone().lerp(to.position, easedProgress);
+			const target = from.target.clone().lerp(to.target, easedProgress);
+			const up = from.up.clone().lerp(to.up, easedProgress).normalize();
+
+			this.applyCameraViewState({ position, target, up });
+			if (progress < 1) {
+				this.resetViewAnimationFrame = window.requestAnimationFrame(tick);
+				return;
+			}
+
+			this.applyCameraViewState(to, persistFinalState);
+			this.resetViewAnimationFrame = null;
+			if (controls) {
+				controls.enabled = true;
+			}
+			onComplete?.();
+		};
+
+		this.resetViewAnimationFrame = window.requestAnimationFrame(tick);
+	}
+
+	private stopResetViewAnimation(): void {
+		if (this.resetViewAnimationFrame !== null) {
+			window.cancelAnimationFrame(this.resetViewAnimationFrame);
+			this.resetViewAnimationFrame = null;
+		}
+
+		const controls = this.getControls();
+		if (controls) {
+			controls.enabled = true;
 		}
 	}
 
@@ -485,7 +581,7 @@ export class GraphSceneRenderer {
 	}
 
 	private applyCameraViewState(
-		cameraPosition: { x: number; y: number; z: number },
+		cameraState: CameraViewState,
 		persistAsResetState = false
 	): void {
 		if (!this.graph) return;
@@ -498,13 +594,13 @@ export class GraphSceneRenderer {
 		};
 		const controls = this.getControls();
 
-		camera.position.set(cameraPosition.x, cameraPosition.y, cameraPosition.z);
-		camera.up.copy(INITIAL_CAMERA_UP);
-		camera.lookAt(ORIGIN);
+		camera.position.copy(cameraState.position);
+		camera.up.copy(cameraState.up);
+		camera.lookAt(cameraState.target);
 		camera.updateProjectionMatrix?.();
 
 		if (controls?.target) {
-			controls.target.copy(ORIGIN);
+			controls.target.copy(cameraState.target);
 		}
 		controls?.update?.();
 		if (persistAsResetState) {
@@ -516,11 +612,18 @@ export class GraphSceneRenderer {
 		return this.graph ? this.graph.controls() as SceneControls : null;
 	}
 
-	private clearResetViewSyncTimeout(): void {
-		if (this.resetViewSyncTimeout !== null) {
-			window.clearTimeout(this.resetViewSyncTimeout);
-			this.resetViewSyncTimeout = null;
-		}
+	private cloneCameraViewState(cameraState: CameraViewState): CameraViewState {
+		return {
+			position: cameraState.position.clone(),
+			target: cameraState.target.clone(),
+			up: cameraState.up.clone(),
+		};
+	}
+
+	private easeInOutCubic(progress: number): number {
+		return progress < 0.5
+			? 4 * progress * progress * progress
+			: 1 - Math.pow(-2 * progress + 2, 3) / 2;
 	}
 
 	private getNodePath(nodeRef: string | GraphNode): string | null {

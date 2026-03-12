@@ -1,7 +1,6 @@
 import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
 import { GraphNode, GraphVisualOptions, PluginSettings } from "./types";
 import { EmbeddingService } from "./embedding";
-import { GraphInspectorPanel } from "./graph-inspector";
 import { PcaReducer } from "./pca-reducer";
 import { createSeededRandom } from "./seeded-rng";
 import { UmapReducer } from "./umap-reducer";
@@ -21,12 +20,10 @@ export class SemanticGraphView extends ItemView {
 	private pluginDir: string;
 	private persistSettings: (settings: PluginSettings) => Promise<void>;
 	private renderer: GraphRenderer | null = null;
-	private inspector: GraphInspectorPanel | null = null;
 	private toolbar: HTMLElement | null = null;
 	private statusEl: HTMLElement | null = null;
 	private graphContainer: HTMLElement | null = null;
 	private graphStage: HTMLElement | null = null;
-	private inspectorContainer: HTMLElement | null = null;
 	private resizeObserver: ResizeObserver | null = null;
 	private linksToggleBtn: HTMLButtonElement | null = null;
 	private gridToggleBtn: HTMLButtonElement | null = null;
@@ -67,8 +64,6 @@ export class SemanticGraphView extends ItemView {
 		this.statusEl = this.toolbar.createSpan({ cls: "semantic-graph-status" });
 		this.graphContainer = container.createDiv({ cls: "semantic-graph-canvas" });
 		this.graphStage = this.graphContainer.createDiv({ cls: "semantic-graph-stage" });
-		this.inspectorContainer = this.graphContainer.createDiv({ cls: "semantic-graph-inspector" });
-		this.inspector = new GraphInspectorPanel(this.inspectorContainer, (path) => this.openNote(path));
 
 		this.resizeObserver = new ResizeObserver(() => {
 			if (this.renderer && this.graphStage) {
@@ -84,9 +79,7 @@ export class SemanticGraphView extends ItemView {
 	async onClose(): Promise<void> {
 		this.resizeObserver?.disconnect();
 		this.renderer?.dispose();
-		this.inspector?.dispose();
 		this.renderer = null;
-		this.inspector = null;
 	}
 
 	updateSettings(settings: PluginSettings): void {
@@ -172,7 +165,7 @@ export class SemanticGraphView extends ItemView {
 	}
 
 	async loadGraph(): Promise<void> {
-		if (!this.graphStage || !this.inspector) return;
+		if (!this.graphStage) return;
 
 		try {
 			this.setStatus("Building graph...");
@@ -235,14 +228,11 @@ export class SemanticGraphView extends ItemView {
 			this.applyPositions(graphData.nodes, finalPositions);
 
 			this.setStatus(`${graphData.nodes.length} notes, ${graphData.links.length} links`);
-			this.inspector.setGraphData(graphData);
 
 			this.renderer?.dispose();
 			this.renderer = new GraphRenderer(
 				this.graphStage,
-				(node) => {
-					this.inspector?.setSelectedNode(node);
-				},
+				(_node) => {},
 				(node) => this.openNote(node.path),
 				this.getVisualOptions()
 			);
