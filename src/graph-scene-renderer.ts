@@ -30,6 +30,12 @@ interface CameraViewState {
 	up: THREE.Vector3;
 }
 
+interface OrbitViewState {
+	azimuth: number;
+	radius: number;
+	height: number;
+}
+
 interface SceneThemePalette {
 	background: string;
 	baseLinkColor: string;
@@ -456,8 +462,13 @@ export class GraphSceneRenderer {
 
 			const progress = Math.min(1, (now - startTime) / durationMs);
 			const easedProgress = this.easeInOutCubic(progress);
-			const position = from.position.clone().lerp(to.position, easedProgress);
 			const target = from.target.clone().lerp(to.target, easedProgress);
+			const orbitFrom = this.toOrbitViewState(from);
+			const orbitTo = this.toOrbitViewState(to);
+			const azimuth = this.interpolateAngle(orbitFrom.azimuth, orbitTo.azimuth, easedProgress);
+			const radius = THREE.MathUtils.lerp(orbitFrom.radius, orbitTo.radius, easedProgress);
+			const height = THREE.MathUtils.lerp(orbitFrom.height, orbitTo.height, easedProgress);
+			const position = this.fromOrbitViewState(target, { azimuth, radius, height });
 			const up = from.up.clone().lerp(to.up, easedProgress).normalize();
 
 			this.applyCameraViewState({ position, target, up });
@@ -618,6 +629,28 @@ export class GraphSceneRenderer {
 			target: cameraState.target.clone(),
 			up: cameraState.up.clone(),
 		};
+	}
+
+	private toOrbitViewState(cameraState: CameraViewState): OrbitViewState {
+		const offset = cameraState.position.clone().sub(cameraState.target);
+		return {
+			azimuth: Math.atan2(offset.z, offset.x),
+			radius: Math.hypot(offset.x, offset.z),
+			height: offset.y,
+		};
+	}
+
+	private fromOrbitViewState(target: THREE.Vector3, orbitState: OrbitViewState): THREE.Vector3 {
+		return new THREE.Vector3(
+			target.x + Math.cos(orbitState.azimuth) * orbitState.radius,
+			target.y + orbitState.height,
+			target.z + Math.sin(orbitState.azimuth) * orbitState.radius
+		);
+	}
+
+	private interpolateAngle(from: number, to: number, progress: number): number {
+		const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from));
+		return from + delta * progress;
 	}
 
 	private easeInOutCubic(progress: number): number {
