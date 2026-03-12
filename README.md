@@ -37,7 +37,7 @@ npm run build
 Copy `main.js`, `manifest.json`, and `styles.css` into:
 
 ```text
-<your-vault>/.obsidian/plugins/obsidian-3d-semantic-graph/
+<your-vault>/.obsidian/plugins/3d-semantic-graph/
 ```
 
 Then restart Obsidian and enable **3D Semantic Graph** in **Settings > Community plugins**.

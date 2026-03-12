@@ -1,9 +1,9 @@
 {
-	"id": "obsidian-3d-semantic-graph",
+	"id": "3d-semantic-graph",
 	"name": "3D Semantic Graph",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Visualize your notes in a 3D semantic space using OpenAI embeddings and UMAP dimensionality reduction.",
+	"description": "Visualize your notes in a 3D semantic space using embedding-based layouts or uploaded vectors.",
 	"author": "hyungrae0907",
 	"isDesktopOnly": true
 }

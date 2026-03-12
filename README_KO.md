@@ -37,7 +37,7 @@ npm run build
 빌드 후 `main.js`, `manifest.json`, `styles.css`를 아래 경로에 복사합니다.
 
 ```text
-<your-vault>/.obsidian/plugins/obsidian-3d-semantic-graph/
+<your-vault>/.obsidian/plugins/3d-semantic-graph/
 ```
 
 그다음 Obsidian을 다시 시작하고 **설정 > 커뮤니티 플러그인**에서 **3D Semantic Graph**를 활성화하면 됩니다.

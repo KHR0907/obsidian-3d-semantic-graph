@@ -37,7 +37,7 @@ npm run build
 构建完成后，将 `main.js`、`manifest.json`、`styles.css` 复制到：
 
 ```text
-<your-vault>/.obsidian/plugins/obsidian-3d-semantic-graph/
+<your-vault>/.obsidian/plugins/3d-semantic-graph/
 ```
 
 然后重启 Obsidian，并在 **Settings > Community plugins** 中启用 **3D Semantic Graph**。
