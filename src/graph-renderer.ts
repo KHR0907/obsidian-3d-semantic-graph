@@ -1,4 +1,5 @@
 import { GraphSceneRenderer } from "./graph-scene-renderer";
+import { ClusterRegion } from "./clustered-sphere-layout";
 import { GraphData, GraphNode, GraphVisualOptions } from "./types";
 
 export class GraphRenderer {
@@ -42,6 +43,14 @@ export class GraphRenderer {
 
 	resetView(): void {
 		this.sceneRenderer.resetView();
+	}
+
+	setClusterRegions(regions: ClusterRegion[]): void {
+		this.sceneRenderer.setClusterRegions(regions);
+	}
+
+	setClustersMode(mode: "on" | "hover" | "off"): void {
+		this.sceneRenderer.setClustersMode(mode);
 	}
 
 	setLinksVisible(visible: boolean): void {

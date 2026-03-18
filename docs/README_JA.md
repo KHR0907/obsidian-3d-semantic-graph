@@ -1,16 +1,16 @@
 # Obsidian 3D Semantic Graph
 
-Obsidian のデスクトップ専用プラグインです。OpenAI API キーを設定すると、ノート本文を埋め込みベクトル化し、UMAP または PCA で 3D 座標に投影して、意味的に近いノート同士を近くに配置します。プラグイン内で埋め込みを生成する代わりに、自分で用意したベクトル JSON をアップロードして使うこともできます。どちらもない場合は、決定的な球状レイアウトにフォールバックします。
+Obsidian のデスクトップ専用プラグインです。OpenAI API キーを設定すると、ノート本文を埋め込みベクトル化し、UMAP または PCA で 3D 座標に投影して、意味的に近いノート同士を近くに配置します。API キーがない場合は、決定的な球状レイアウトにフォールバックします。
 
-[English](../README.md) | [한국어](./README_KO.md) | [中文](./README_ZH.md)
+[English](./README.md) | [한국어](./README_KO.md) | [中文](./README_ZH.md)
 
 ## 主な機能
 
 - OpenAI 埋め込みを使った意味ベースの 3D 配置
-- API 埋め込みを上書きするカスタムベクトル JSON アップロード
 - UMAP または PCA による 3D 投影
 - シードによる再現可能なレイアウトと任意の sphereize 表示
 - Obsidian の実リンク情報に基づく接続線表示
+- 選択ノートと接続ノートを確認できる Inspector パネル
 - ライト/ダークのシーンテーマ、グリッド表示、自動回転、ビューリセット
 - フォルダまたは最初のタグによるノード色分け
 - 変更されていないノートを再利用する埋め込みキャッシュ
@@ -20,10 +20,8 @@ Obsidian のデスクトップ専用プラグインです。OpenAI API キーを
 
 1. 設定で除外していない markdown ファイルを vault から読み込みます。
 2. 各ノートをノードに変換し、Obsidian の resolved links から接続線を作ります。
-3. カスタムベクトル JSON がアップロードされている場合は、そのベクトルを直接使って 3D 座標を計算します。
-4. そうでなく OpenAI API キーがある場合は、本文を整形して埋め込みを作成し、キャッシュしたうえで選択した手法で 3D 座標へ変換します。
-5. ベクトル JSON も API キーもない場合、または埋め込み処理に失敗した場合は決定的な球状レイアウトを使います。
-6. 球状レイアウトモードでは、パスのハッシュに基づく安定した順序と golden-angle 配置でノートを 3D 球体内部に分布させるため、再読み込みしても再現可能ですが意味ベースの配置ではありません。
+3. OpenAI API キーがある場合は、本文を整形して埋め込みを作成し、キャッシュしたうえで選択した手法で 3D 座標へ変換します。
+4. API キーがない場合、または埋め込み処理に失敗した場合は球状レイアウトを使います。
 
 ## インストール
 
@@ -31,7 +29,7 @@ Obsidian のデスクトップ専用プラグインです。OpenAI API キーを
 
 ```bash
 git clone <repository-url>
-cd <repository-directory>
+cd obsidian-3d-semantic-graph
 npm install
 npm run build
 ```
@@ -39,7 +37,7 @@ npm run build
 ビルド後、`main.js`、`manifest.json`、`styles.css` を次の場所へコピーします。
 
 ```text
-<your-vault>/.obsidian/plugins/3d-semantic-graph/
+<your-vault>/.obsidian/plugins/obsidian-3d-semantic-graph/
 ```
 
 その後 Obsidian を再起動し、**Settings > Community plugins** で **3D Semantic Graph** を有効にします。
@@ -51,22 +49,21 @@ npm run dev
 npm run build
 ```
 
+
 ## 使い方
 
 1. **Settings > 3D Semantic Graph** を開きます。
-2. OpenAI API キーと埋め込みモデルを設定するか、カスタムベクトル JSON をアップロードします。
-3. 両方ある場合は、アップロードしたベクトル JSON が API 埋め込みより優先されます。
-4. リボンアイコン、または **Open 3D Semantic Graph** コマンドからビューを開きます。
-5. ツールバーで再読み込み、カメラのリセット、リンク表示、グリッド表示を操作できます。
-6. ノートを直接開くにはノードを `Shift`+クリックします。
+2. 意味ベースの配置を有効にする場合は OpenAI API キーを入力します。
+3. リボンアイコン、または **Open 3D Semantic Graph** コマンドからビューを開きます。
+4. ツールバーで再読み込み、カメラのリセット、リンク表示、グリッド表示を操作できます。
+5. ノードをクリックすると Inspector に固定され、`Shift`+クリックまたは Inspector のボタンでノートを開けます。
 
 ## 設定項目
 
 | 設定 | 説明 | 既定値 |
 | --- | --- | --- |
-| API Key | OpenAI API キー。アップロードベクトルを使う場合は空でも構いません。何もなければ球状レイアウト fallback を使用 | 空 |
+| API Key | OpenAI API キー。空の場合は球状レイアウトのみ使用 | 空 |
 | Embedding Model | 意味レイアウトに使う OpenAI 埋め込みモデル | `text-embedding-3-large` |
-| Custom Vector JSON | 事前計算済みのベクトル JSON をアップロードします。存在する場合は API 埋め込みの代わりに使います。 | 空 |
 | Projection Method | 3D 座標生成に使う次元削減手法 | `umap` |
 | Layout Seed | UMAP と重なり解消に使うシード値 | ランダム |
 | Sphereize Data | 意味座標を球面方向へ一部ブレンドします | `false` |
@@ -87,27 +84,6 @@ npm run build
 - キャッシュファイル: `embeddings-cache.json`
 - 保存先: プラグインディレクトリ
 - モデル変更時またはノート本文変更時に自動で無効化
-
-## カスタムベクトル JSON 形式
-
-アップロードするベクトル JSON は次の形式です。
-
-```json
-{
-  "entries": {
-    "folder/note-a.md": {
-      "embedding": [0.12, -0.48, 0.91]
-    },
-    "folder/note-b.md": {
-      "embedding": [-0.33, 0.27, 0.54]
-    }
-  }
-}
-```
-
-- `entries` のキーは vault 内のノートパスと一致する必要があります。
-- 各 `embedding` は数値配列である必要があります。
-- アップロードしたファイルはプラグインディレクトリの `uploaded-vectors.json` として保存されます。
 
 ## 技術スタック
 

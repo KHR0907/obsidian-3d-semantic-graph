@@ -1,6 +1,8 @@
 import ForceGraph3D from "3d-force-graph";
 import * as THREE from "three";
+import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
 import { GraphData, GraphLink, GraphNode, GraphVisualOptions } from "./types";
+import { ClusterRegion } from "./clustered-sphere-layout";
 
 const BASE_LINK_OPACITY = 0.2;
 const DIMMED_LINK_OPACITY = 0.03;
@@ -77,12 +79,19 @@ export class GraphSceneRenderer {
 	private highlightedNodes = new Set<string>();
 	private visualOptions: GraphVisualOptions;
 	private helperObjects: THREE.Object3D[] = [];
+	private clusterObjects: THREE.Object3D[] = [];
+	private nodePathToClusterIdx = new Map<string, number>();
+	private clustersMode: "on" | "hover" | "off" = "hover";
+	private hoverRaycaster = new THREE.Raycaster();
+	private hoverMouse = new THREE.Vector2();
+	private readonly handleClusterHover: EventListener;
 	private autoRotateFrame: number | null = null;
 	private autoRotateResumeTimeout: number | null = null;
 	private resetViewAnimationFrame: number | null = null;
 	private autoRotateStart = 0;
 	private hasUserInteracted = false;
 	private initialCameraState: CameraViewState | null = null;
+	private isCameraMoving = false;
 	private readonly stopAutoRotateOnInteraction: EventListener;
 
 	constructor(
@@ -100,9 +109,20 @@ export class GraphSceneRenderer {
 			this.stopResetViewAnimation();
 			this.stopAutoRotate();
 		};
-		this.container.addEventListener("pointerdown", this.stopAutoRotateOnInteraction, { passive: true });
-		this.container.addEventListener("wheel", this.stopAutoRotateOnInteraction, { passive: true });
+		this.handleClusterHover = (event: Event) => this.raycastClusters(event as MouseEvent);
+		this.container.addEventListener("pointerdown", (e) => {
+			this.stopAutoRotateOnInteraction(e);
+			this.isCameraMoving = true;
+			this.hideAllClusters();
+		}, { passive: true });
+		this.container.addEventListener("pointerup", () => { this.isCameraMoving = false; }, { passive: true });
+		this.container.addEventListener("pointerleave", () => { this.isCameraMoving = false; }, { passive: true });
+		this.container.addEventListener("wheel", (e) => {
+			this.stopAutoRotateOnInteraction(e);
+			this.hideAllClusters();
+		}, { passive: true });
 		this.container.addEventListener("touchstart", this.stopAutoRotateOnInteraction, { passive: true });
+		this.container.addEventListener("pointermove", this.handleClusterHover, { passive: true });
 	}
 
 	render(data: GraphData): void {
@@ -199,12 +219,14 @@ export class GraphSceneRenderer {
 		this.container.removeEventListener("pointerdown", this.stopAutoRotateOnInteraction);
 		this.container.removeEventListener("wheel", this.stopAutoRotateOnInteraction);
 		this.container.removeEventListener("touchstart", this.stopAutoRotateOnInteraction);
+		this.container.removeEventListener("pointermove", this.handleClusterHover);
 		this.container.replaceChildren();
 	}
 
 	private disposeGraph(): void {
 		this.stopAutoRotate();
 		this.stopResetViewAnimation();
+		this.clearClusterObjects();
 		this.clearHelperObjects();
 		this.disposeNodeObjects();
 
@@ -509,6 +531,146 @@ export class GraphSceneRenderer {
 				this.enableAutoRotate();
 			}
 		}, RESET_VIEW_DURATION_MS);
+	}
+
+	setClusterRegions(regions: ClusterRegion[]): void {
+		this.clearClusterObjects();
+		this.nodePathToClusterIdx.clear();
+		if (!this.graph || regions.length === 0) return;
+
+		const scene = (this.graph as any).scene() as THREE.Scene;
+		const PADDING = 12;
+		const MIN_HULL_POINTS = 4;
+
+		for (let idx = 0; idx < regions.length; idx++) {
+			const region = regions[idx];
+			if (region.points.length === 0) continue;
+
+			// Map node paths to this cluster index
+			for (const path of region.nodePaths) {
+				this.nodePathToClusterIdx.set(path, idx);
+			}
+
+			// Compute centroid
+			const cx = region.points.reduce((s, p) => s + p[0], 0) / region.points.length;
+			const cy = region.points.reduce((s, p) => s + p[1], 0) / region.points.length;
+			const cz = region.points.reduce((s, p) => s + p[2], 0) / region.points.length;
+
+			// Inflate points outward from centroid
+			const inflated: THREE.Vector3[] = region.points.map((p) => {
+				const dx = p[0] - cx, dy = p[1] - cy, dz = p[2] - cz;
+				const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+				return new THREE.Vector3(
+					p[0] + (dx / len) * PADDING,
+					p[1] + (dy / len) * PADDING,
+					p[2] + (dz / len) * PADDING,
+				);
+			});
+
+			// ConvexGeometry needs at least 4 non-coplanar points
+			if (inflated.length < MIN_HULL_POINTS) {
+				const base = inflated[0] ?? new THREE.Vector3(cx, cy, cz);
+				while (inflated.length < MIN_HULL_POINTS) {
+					inflated.push(new THREE.Vector3(
+						base.x + (Math.random() - 0.5) * PADDING * 2,
+						base.y + (Math.random() - 0.5) * PADDING * 2,
+						base.z + (Math.random() - 0.5) * PADDING * 2,
+					));
+				}
+			}
+
+			try {
+				const geometry = new ConvexGeometry(inflated);
+				const material = new THREE.MeshStandardMaterial({
+					color: region.color,
+					transparent: true,
+					opacity: 0,
+					roughness: 0.6,
+					metalness: 0,
+					side: THREE.DoubleSide,
+					depthWrite: false,
+				});
+				const mesh = new THREE.Mesh(geometry, material);
+				scene.add(mesh);
+				this.clusterObjects.push(mesh);
+			} catch {
+				// Degenerate hull — push placeholder to keep indices aligned
+				const placeholder = new THREE.Object3D();
+				placeholder.visible = false;
+				this.clusterObjects.push(placeholder);
+			}
+		}
+
+		this.syncClusterVisibility();
+	}
+
+	setClustersMode(mode: "on" | "hover" | "off"): void {
+		this.clustersMode = mode;
+		this.syncClusterVisibility();
+	}
+
+	private syncClusterVisibility(): void {
+		for (const obj of this.clusterObjects) {
+			if (this.clustersMode === "on") {
+				obj.visible = true;
+				this.setMeshOpacity(obj, 0.12);
+			} else if (this.clustersMode === "off") {
+				obj.visible = false;
+			} else {
+				// hover: visible for raycasting but transparent
+				obj.visible = true;
+				this.setMeshOpacity(obj, 0);
+			}
+		}
+	}
+
+	private hideAllClusters(): void {
+		if (this.clustersMode !== "hover") return;
+		for (const obj of this.clusterObjects) {
+			this.setMeshOpacity(obj, 0);
+		}
+	}
+
+	private raycastClusters(event: MouseEvent): void {
+		if (this.clustersMode !== "hover" || this.isCameraMoving || !this.graph || this.clusterObjects.length === 0) return;
+
+		const rect = this.container.getBoundingClientRect();
+		this.hoverMouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+		this.hoverMouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+		const camera = this.graph.camera() as THREE.Camera;
+		this.hoverRaycaster.setFromCamera(this.hoverMouse, camera);
+
+		const intersects = this.hoverRaycaster.intersectObjects(this.clusterObjects, false);
+		const hitObj = intersects.length > 0 ? intersects[0].object : null;
+
+		for (const obj of this.clusterObjects) {
+			this.setMeshOpacity(obj, obj === hitObj ? 0.12 : 0);
+		}
+	}
+
+	private setMeshOpacity(obj: THREE.Object3D, opacity: number): void {
+		obj.traverse((child) => {
+			const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+			if (!mat || !("opacity" in mat)) return;
+			mat.opacity = opacity;
+			mat.transparent = true;
+			mat.needsUpdate = true;
+		});
+	}
+
+	private clearClusterObjects(): void {
+		this.nodePathToClusterIdx.clear();
+		if (!this.graph) {
+			this.clusterObjects = [];
+			return;
+		}
+		const scene = (this.graph as any).scene() as THREE.Scene;
+		for (const obj of this.clusterObjects) {
+			scene.remove(obj);
+			this.disposeObject(obj);
+		}
+		this.clusterObjects = [];
 	}
 
 	private clearHelperObjects(): void {

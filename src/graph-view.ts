@@ -5,6 +5,7 @@ import { PcaReducer } from "./pca-reducer";
 import { createSeededRandom } from "./seeded-rng";
 import { UmapReducer } from "./umap-reducer";
 import { buildGraphData } from "./graph-data";
+import { createClusteredSphereLayout } from "./clustered-sphere-layout";
 import { GraphRenderer } from "./graph-renderer";
 import { readUploadedVectors } from "./uploaded-vectors";
 
@@ -28,6 +29,7 @@ export class SemanticGraphView extends ItemView {
 	private resizeObserver: ResizeObserver | null = null;
 	private linksToggleBtn: HTMLButtonElement | null = null;
 	private gridToggleBtn: HTMLButtonElement | null = null;
+	private clustersToggleBtn: HTMLButtonElement | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -59,8 +61,11 @@ export class SemanticGraphView extends ItemView {
 		this.linksToggleBtn.addEventListener("click", () => void this.toggleLinks());
 		this.gridToggleBtn = this.toolbar.createEl("button", { cls: "semantic-graph-btn" });
 		this.gridToggleBtn.addEventListener("click", () => void this.toggleGrid());
+		this.clustersToggleBtn = this.toolbar.createEl("button", { cls: "semantic-graph-btn" });
+		this.clustersToggleBtn.addEventListener("click", () => void this.toggleClusters());
 		this.updateLinksToggleButton();
 		this.updateGridToggleButton();
+		this.updateClustersToggleButton();
 
 		this.statusEl = this.toolbar.createSpan({ cls: "semantic-graph-status" });
 		this.graphContainer = container.createDiv({ cls: "semantic-graph-canvas" });
@@ -140,6 +145,31 @@ export class SemanticGraphView extends ItemView {
 		await this.persistSettings(this.settings);
 	}
 
+	private getClustersMode(): "on" | "hover" | "off" {
+		const v = this.settings.showClusters;
+		if (v === "on" || v === "hover" || v === "off") return v;
+		return "hover";
+	}
+
+	private updateClustersToggleButton(): void {
+		if (!this.clustersToggleBtn) return;
+		const labels = { on: "Clusters On", hover: "Clusters Hover", off: "Clusters Off" } as const;
+		this.clustersToggleBtn.setText(labels[this.getClustersMode()]);
+		this.clustersToggleBtn.classList.toggle("is-active", this.getClustersMode() !== "off");
+	}
+
+	private async toggleClusters(): Promise<void> {
+		const cycle = { on: "hover", hover: "off", off: "on" } as const;
+		this.settings = {
+			...this.settings,
+			showClusters: cycle[this.getClustersMode()],
+		};
+
+		this.renderer?.setClustersMode(this.settings.showClusters);
+		this.updateClustersToggleButton();
+		await this.persistSettings(this.settings);
+	}
+
 	private openNote(path: string): void {
 		const file = this.app.vault.getAbstractFileByPath(path);
 		if (file) this.app.workspace.getLeaf(false).openFile(file as any);
@@ -180,6 +210,7 @@ export class SemanticGraphView extends ItemView {
 
 			const spherePositions = this.createSphereLayout(graphData.nodes, layoutRadius);
 			let finalPositions = spherePositions;
+			let clusterResult: import("./galaxy-layout").ClusteredSphereResult | null = null;
 
 			if (canGenerateEmbeddings(this.settings)) {
 				try {
@@ -209,14 +240,34 @@ export class SemanticGraphView extends ItemView {
 								layoutRadius
 							);
 					} else {
-						this.setStatus("Using sphere layout...");
+						this.setStatus("Using clustered sphere layout...");
+						clusterResult = createClusteredSphereLayout(
+							graphData.nodes, layoutRadius, this.settings.layoutSeed
+						);
+						finalPositions = clusterResult.positions;
 					}
 				} catch (embErr: any) {
 					console.warn("Embedding step failed:", embErr?.message);
-					this.setStatus("Embedding failed, using sphere layout...");
+					this.setStatus("Embedding failed, using clustered sphere layout...");
+					clusterResult = createClusteredSphereLayout(
+						graphData.nodes, layoutRadius, this.settings.layoutSeed
+					);
+					finalPositions = clusterResult.positions;
 				}
 			} else {
-				this.setStatus("Using sphere layout...");
+				this.setStatus("Using clustered sphere layout...");
+				clusterResult = createClusteredSphereLayout(
+					graphData.nodes, layoutRadius, this.settings.layoutSeed
+				);
+				finalPositions = clusterResult.positions;
+			}
+
+			// Apply cluster colors to nodes
+			if (clusterResult) {
+				for (const node of graphData.nodes) {
+					const color = clusterResult.nodeColors.get(node.path);
+					if (color) node.color = color;
+				}
 			}
 
 			this.enforceMinDistance(
@@ -231,12 +282,15 @@ export class SemanticGraphView extends ItemView {
 			this.renderer?.dispose();
 			this.renderer = new GraphRenderer(
 				this.graphStage,
-				(_node) => {},
+				() => {},
 				(node) => this.openNote(node.path),
 				this.getVisualOptions()
 			);
 			this.renderer.render(graphData);
 			this.renderer.setLinksVisible(this.settings.showLinks);
+			if (clusterResult) {
+				this.renderer.setClusterRegions(clusterResult.regions);
+			}
 		} catch (err: any) {
 			console.error("Semantic Graph error:", err);
 			const msg = err?.message || String(err);
@@ -283,7 +337,8 @@ export class SemanticGraphView extends ItemView {
 			const y = 1 - 2 * t;
 			const ringRadius = Math.sqrt(Math.max(0, 1 - y * y));
 			const theta = goldenAngle * i;
-			const radius = targetRadius * Math.cbrt(t);
+			const radialT = this.hashToUnitInterval(`${node.path}:${this.settings.layoutSeed}:radius`);
+			const radius = targetRadius * Math.cbrt(radialT);
 
 			positions.set(node.path, [
 				Math.cos(theta) * ringRadius * radius,
@@ -449,6 +504,10 @@ export class SemanticGraphView extends ItemView {
 		}
 
 		return hash >>> 0;
+	}
+
+	private hashToUnitInterval(value: string): number {
+		return (this.hashPath(value) + 0.5) / 4294967296;
 	}
 
 	private getVisualOptions(): GraphVisualOptions {

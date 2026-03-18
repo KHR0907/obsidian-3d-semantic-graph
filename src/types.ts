@@ -15,6 +15,7 @@ export interface PluginSettings {
 	nodeColorBy: "folder" | "tag";
 	showLinks: boolean;
 	showGrid: boolean;
+	showClusters: "on" | "hover" | "off";
 	sceneTheme: "dark" | "light";
 	nodeOpacity: number;
 	nodeSizeScale: number;
@@ -44,6 +45,7 @@ export function createDefaultSettings(): PluginSettings {
 		nodeColorBy: "folder",
 		showLinks: false,
 		showGrid: true,
+		showClusters: "hover",
 		sceneTheme: "light",
 		nodeOpacity: 1,
 		nodeSizeScale: 1.5,
