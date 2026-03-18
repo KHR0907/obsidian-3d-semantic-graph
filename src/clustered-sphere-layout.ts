@@ -133,6 +133,37 @@ export function createClusteredSphereLayout(
 	return { positions, regions, nodeColors };
 }
 
+/**
+ * Build cluster regions from already-positioned nodes, grouped by folder.
+ * Works with any layout (semantic, sphereize, clustered sphere, etc.)
+ */
+export function buildClusterRegions(nodes: GraphNode[]): ClusterRegion[] {
+	const folderGroups = new Map<string, GraphNode[]>();
+	for (const node of nodes) {
+		const folder = node.path.includes("/")
+			? node.path.substring(0, node.path.lastIndexOf("/"))
+			: "/";
+		if (!folderGroups.has(folder)) folderGroups.set(folder, []);
+		folderGroups.get(folder)!.push(node);
+	}
+
+	const regions: ClusterRegion[] = [];
+	for (const [folder, group] of folderGroups) {
+		const points: [number, number, number][] = [];
+		const nodePaths: string[] = [];
+		for (const node of group) {
+			if (node.x != null && node.y != null && node.z != null) {
+				points.push([node.x, node.y, node.z]);
+				nodePaths.push(node.path);
+			}
+		}
+		if (points.length > 0) {
+			regions.push({ points, nodePaths, color: group[0].color, folder });
+		}
+	}
+	return regions;
+}
+
 function tangent(x: number, y: number, z: number): [number, number, number] {
 	const up: [number, number, number] = Math.abs(y) < 0.9 ? [0, 1, 0] : [1, 0, 0];
 	const t = cross([x, y, z], up);

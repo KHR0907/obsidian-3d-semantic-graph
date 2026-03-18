@@ -5,7 +5,7 @@ import { PcaReducer } from "./pca-reducer";
 import { createSeededRandom } from "./seeded-rng";
 import { UmapReducer } from "./umap-reducer";
 import { buildGraphData } from "./graph-data";
-import { createClusteredSphereLayout } from "./clustered-sphere-layout";
+import { createClusteredSphereLayout, buildClusterRegions } from "./clustered-sphere-layout";
 import { GraphRenderer } from "./graph-renderer";
 import { readUploadedVectors } from "./uploaded-vectors";
 
@@ -210,7 +210,7 @@ export class SemanticGraphView extends ItemView {
 
 			const spherePositions = this.createSphereLayout(graphData.nodes, layoutRadius);
 			let finalPositions = spherePositions;
-			let clusterResult: import("./galaxy-layout").ClusteredSphereResult | null = null;
+			let clusterResult: import("./clustered-sphere-layout").ClusteredSphereResult | null = null;
 
 			if (canGenerateEmbeddings(this.settings)) {
 				try {
@@ -288,9 +288,10 @@ export class SemanticGraphView extends ItemView {
 			);
 			this.renderer.render(graphData);
 			this.renderer.setLinksVisible(this.settings.showLinks);
-			if (clusterResult) {
-				this.renderer.setClusterRegions(clusterResult.regions);
-			}
+			const regions = clusterResult
+				? clusterResult.regions
+				: buildClusterRegions(graphData.nodes);
+			this.renderer.setClusterRegions(regions);
 		} catch (err: any) {
 			console.error("Semantic Graph error:", err);
 			const msg = err?.message || String(err);
