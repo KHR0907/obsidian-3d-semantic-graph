@@ -46,7 +46,8 @@ export default class SemanticGraphPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		const loaded = await this.loadData() as Partial<PluginSettings> & {
+		const loadedData = await this.loadData();
+		const loaded = (loadedData ?? {}) as Partial<PluginSettings> & {
 			nodeAssetMode?: unknown;
 			openaiApiKey?: unknown;
 			embeddingProvider?: unknown;

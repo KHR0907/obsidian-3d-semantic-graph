@@ -1,13 +1,8 @@
 import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
 import { canGenerateEmbeddings, GraphNode, GraphVisualOptions, PluginSettings } from "./types";
-import { EmbeddingService } from "./embedding";
-import { PcaReducer } from "./pca-reducer";
 import { createSeededRandom } from "./seeded-rng";
-import { UmapReducer } from "./umap-reducer";
 import { buildGraphData } from "./graph-data";
 import { createClusteredSphereLayout, buildClusterRegions } from "./clustered-sphere-layout";
-import { GraphRenderer } from "./graph-renderer";
-import { readUploadedVectors } from "./uploaded-vectors";
 
 export const VIEW_TYPE = "semantic-graph-3d";
 
@@ -21,7 +16,7 @@ export class SemanticGraphView extends ItemView {
 	private settings: PluginSettings;
 	private pluginDir: string;
 	private persistSettings: (settings: PluginSettings) => Promise<void>;
-	private renderer: GraphRenderer | null = null;
+	private renderer: import("./graph-renderer").GraphRenderer | null = null;
 	private toolbar: HTMLElement | null = null;
 	private statusEl: HTMLElement | null = null;
 	private graphContainer: HTMLElement | null = null;
@@ -178,6 +173,7 @@ export class SemanticGraphView extends ItemView {
 	private async reduceEmbeddings(vectors: number[][]): Promise<number[][]> {
 		if (this.settings.projectionMethod === "pca") {
 			this.setStatus("Running PCA...");
+			const { PcaReducer } = await import("./pca-reducer");
 			const reducer = new PcaReducer();
 			return reducer.reduce(vectors, (step, total) => {
 				this.setStatus(`PCA: ${step}/${total}`);
@@ -185,6 +181,7 @@ export class SemanticGraphView extends ItemView {
 		}
 
 		this.setStatus("Running UMAP...");
+		const { UmapReducer } = await import("./umap-reducer");
 		const reducer = new UmapReducer({
 			nNeighbors: this.settings.umapNNeighbors,
 			minDist: this.settings.umapMinDist,
@@ -280,6 +277,7 @@ export class SemanticGraphView extends ItemView {
 			this.setStatus(`${graphData.nodes.length} notes, ${graphData.links.length} links`);
 
 			this.renderer?.dispose();
+			const { GraphRenderer } = await import("./graph-renderer");
 			this.renderer = new GraphRenderer(
 				this.graphStage,
 				() => {},
@@ -302,6 +300,7 @@ export class SemanticGraphView extends ItemView {
 
 	private async loadProviderEmbeddings(): Promise<Map<string, number[]>> {
 		this.setStatus("Generating embeddings...");
+		const { EmbeddingService } = await import("./embedding");
 		const embeddingService = new EmbeddingService(this.app, this.settings, this.pluginDir);
 		return embeddingService.getEmbeddings((current, total) => {
 			this.setStatus(`Embedding... ${current}/${total}`);
@@ -310,6 +309,7 @@ export class SemanticGraphView extends ItemView {
 
 	private async loadUploadedEmbeddingVectors(): Promise<Map<string, number[]>> {
 		this.setStatus("Loading uploaded vectors...");
+		const { readUploadedVectors } = await import("./uploaded-vectors");
 		return readUploadedVectors(this.app, this.pluginDir);
 	}
 
