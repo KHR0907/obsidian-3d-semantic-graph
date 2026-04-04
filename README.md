@@ -2,7 +2,7 @@
 
 Desktop-only Obsidian plugin that visualizes your notes in an interactive 3D space. Notes are positioned using OpenAI embeddings projected into 3D via UMAP or PCA, so semantically related notes cluster together. Without an API key, the plugin uses a folder-based clustered sphere layout with ConvexHull cluster regions.
 
-[한국어](./docs/README_KO.md) | [日本語](./docs/README_JA.md) | [中文](./docs/README_ZH.md)
+[Korean](./docs/README_KO.md)
 
 ## Features
 
