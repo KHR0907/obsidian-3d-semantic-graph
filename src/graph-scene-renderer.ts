@@ -1,4 +1,4 @@
-import ForceGraph3D from "3d-force-graph";
+import ForceGraph3D, { type ForceGraph3DInstance } from "3d-force-graph";
 import * as THREE from "three";
 import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
 import { GraphData, GraphLink, GraphNode, GraphVisualOptions } from "./types";
@@ -66,8 +66,10 @@ const SCENE_THEMES: Record<GraphVisualOptions["sceneTheme"], SceneThemePalette> 
 	},
 };
 
+const createForceGraph3D = ForceGraph3D as unknown as () => (element: HTMLElement) => ForceGraph3DInstance;
+
 export class GraphSceneRenderer {
-	private graph: ReturnType<typeof ForceGraph3D> | null = null;
+	private graph: ForceGraph3DInstance | null = null;
 	private container: HTMLElement;
 	private onNodeSelect: (node: GraphNode | null) => void;
 	private onNodeOpen: (node: GraphNode) => void;
@@ -79,12 +81,19 @@ export class GraphSceneRenderer {
 	private highlightedNodes = new Set<string>();
 	private visualOptions: GraphVisualOptions;
 	private helperObjects: THREE.Object3D[] = [];
+	private axesHelper: THREE.AxesHelper | null = null;
+	private gridHelper: THREE.GridHelper | null = null;
 	private clusterObjects: THREE.Object3D[] = [];
+	private currentClusterRegions: ClusterRegion[] = [];
 	private nodePathToClusterIdx = new Map<string, number>();
 	private clustersMode: "on" | "hover" | "off" = "hover";
 	private hoverRaycaster = new THREE.Raycaster();
 	private hoverMouse = new THREE.Vector2();
 	private readonly handleClusterHover: EventListener;
+	private readonly handlePointerDown: EventListener;
+	private readonly handlePointerUp: EventListener;
+	private readonly handlePointerLeave: EventListener;
+	private readonly handleWheel: EventListener;
 	private autoRotateFrame: number | null = null;
 	private autoRotateResumeTimeout: number | null = null;
 	private resetViewAnimationFrame: number | null = null;
@@ -98,29 +107,39 @@ export class GraphSceneRenderer {
 		container: HTMLElement,
 		onNodeSelect: (node: GraphNode | null) => void,
 		onNodeOpen: (node: GraphNode) => void,
-		visualOptions: GraphVisualOptions
+		visualOptions: GraphVisualOptions,
+		linksVisible: boolean
 	) {
 		this.container = container;
 		this.onNodeSelect = onNodeSelect;
 		this.onNodeOpen = onNodeOpen;
 		this.visualOptions = { ...visualOptions };
+		this.linksVisible = linksVisible;
 		this.stopAutoRotateOnInteraction = () => {
 			this.hasUserInteracted = true;
 			this.stopResetViewAnimation();
 			this.stopAutoRotate();
 		};
 		this.handleClusterHover = (event: Event) => this.raycastClusters(event as MouseEvent);
-		this.container.addEventListener("pointerdown", (e) => {
-			this.stopAutoRotateOnInteraction(e);
+		this.handlePointerDown = (event: Event) => {
+			this.stopAutoRotateOnInteraction(event);
 			this.isCameraMoving = true;
 			this.hideAllClusters();
-		}, { passive: true });
-		this.container.addEventListener("pointerup", () => { this.isCameraMoving = false; }, { passive: true });
-		this.container.addEventListener("pointerleave", () => { this.isCameraMoving = false; }, { passive: true });
-		this.container.addEventListener("wheel", (e) => {
-			this.stopAutoRotateOnInteraction(e);
+		};
+		this.handlePointerUp = () => {
+			this.isCameraMoving = false;
+		};
+		this.handlePointerLeave = () => {
+			this.isCameraMoving = false;
+		};
+		this.handleWheel = (event: Event) => {
+			this.stopAutoRotateOnInteraction(event);
 			this.hideAllClusters();
-		}, { passive: true });
+		};
+		this.container.addEventListener("pointerdown", this.handlePointerDown, { passive: true });
+		this.container.addEventListener("pointerup", this.handlePointerUp, { passive: true });
+		this.container.addEventListener("pointerleave", this.handlePointerLeave, { passive: true });
+		this.container.addEventListener("wheel", this.handleWheel, { passive: true });
 		this.container.addEventListener("touchstart", this.stopAutoRotateOnInteraction, { passive: true });
 		this.container.addEventListener("pointermove", this.handleClusterHover, { passive: true });
 	}
@@ -130,7 +149,8 @@ export class GraphSceneRenderer {
 		this.currentData = data;
 		this.adjacency = this.buildAdjacency(data);
 
-		this.graph = ForceGraph3D()(this.container)
+		const graph = createForceGraph3D()(this.container) as any;
+		this.graph = graph
 			.width(this.container.clientWidth)
 			.height(this.container.clientHeight)
 			.backgroundColor(this.getPalette().background)
@@ -156,7 +176,11 @@ export class GraphSceneRenderer {
 		this.applyCameraViewState(this.initialCameraState, true);
 		this.enableAutoRotate();
 		this.installSceneHelpers();
+		this.syncLinkVisibilityInScene();
 		this.syncNodeAppearance();
+		if (this.currentClusterRegions.length > 0) {
+			this.setClusterRegions(this.currentClusterRegions);
+		}
 	}
 
 	resize(width: number, height: number): void {
@@ -191,13 +215,18 @@ export class GraphSceneRenderer {
 
 	setLinksVisible(visible: boolean): void {
 		this.linksVisible = visible;
-		this.graph?.refresh();
+		if (this.graph) {
+			this.graph.linkVisibility(() => this.linksVisible);
+			this.graph.refresh();
+		}
+		this.syncLinkVisibilityInScene();
 	}
 
 	updateVisualOptions(visualOptions: GraphVisualOptions): void {
 		const previous = this.visualOptions;
 		this.visualOptions = { ...visualOptions };
 		this.initialCameraState = this.getInitialCameraState();
+		let requiresRefresh = false;
 
 		if (!this.graph) return;
 		if (previous.nodeSizeScale !== this.visualOptions.nodeSizeScale && this.currentData) {
@@ -206,18 +235,42 @@ export class GraphSceneRenderer {
 			return;
 		}
 
-		this.applyControlSensitivity();
-		this.syncAutoRotate();
-		this.graph.backgroundColor(this.getPalette().background);
-		this.installSceneHelpers();
-		this.syncNodeAppearance();
-		this.graph.refresh();
+		if (previous.dragSensitivity !== this.visualOptions.dragSensitivity) {
+			this.applyControlSensitivity();
+		}
+		if (previous.autoOrbitSpeed !== this.visualOptions.autoOrbitSpeed) {
+			this.syncAutoRotate();
+		}
+		if (previous.sceneTheme !== this.visualOptions.sceneTheme) {
+			this.graph.backgroundColor(this.getPalette().background);
+			requiresRefresh = true;
+		}
+		if (
+			previous.sceneTheme !== this.visualOptions.sceneTheme ||
+			previous.sceneExtent !== this.visualOptions.sceneExtent
+		) {
+			this.installSceneHelpers();
+		} else if (previous.showGrid !== this.visualOptions.showGrid) {
+			this.syncGridVisibility();
+		}
+		if (
+			previous.nodeOpacity !== this.visualOptions.nodeOpacity ||
+			previous.sceneTheme !== this.visualOptions.sceneTheme
+		) {
+			this.syncNodeAppearance();
+			requiresRefresh = true;
+		}
+		if (requiresRefresh) {
+			this.graph.refresh();
+		}
 	}
 
 	dispose(): void {
 		this.disposeGraph();
-		this.container.removeEventListener("pointerdown", this.stopAutoRotateOnInteraction);
-		this.container.removeEventListener("wheel", this.stopAutoRotateOnInteraction);
+		this.container.removeEventListener("pointerdown", this.handlePointerDown);
+		this.container.removeEventListener("pointerup", this.handlePointerUp);
+		this.container.removeEventListener("pointerleave", this.handlePointerLeave);
+		this.container.removeEventListener("wheel", this.handleWheel);
 		this.container.removeEventListener("touchstart", this.stopAutoRotateOnInteraction);
 		this.container.removeEventListener("pointermove", this.handleClusterHover);
 		this.container.replaceChildren();
@@ -231,6 +284,15 @@ export class GraphSceneRenderer {
 		this.disposeNodeObjects();
 
 		if (this.graph) {
+			const controls = this.graph.controls() as SceneControls & { dispose?: () => void };
+			const renderer = this.graph.renderer() as THREE.WebGLRenderer & {
+				forceContextLoss?: () => void;
+				renderLists?: { dispose?: () => void };
+			};
+			controls?.dispose?.();
+			renderer.renderLists?.dispose?.();
+			renderer.dispose();
+			renderer.forceContextLoss?.();
 			this.graph._destructor();
 			this.graph = null;
 		}
@@ -342,8 +404,7 @@ export class GraphSceneRenderer {
 		}
 		scene.add(axes);
 		this.helperObjects.push(axes);
-
-		if (!this.visualOptions.showGrid) return;
+		this.axesHelper = axes;
 
 		const grid = new THREE.GridHelper(this.getGridSize(), this.getGridDivisions(), palette.gridCenterColor, palette.gridColor);
 		const gridMaterial = grid.material as THREE.Material & { opacity: number; transparent: boolean; depthWrite?: boolean };
@@ -351,8 +412,27 @@ export class GraphSceneRenderer {
 		gridMaterial.opacity = this.visualOptions.sceneTheme === "dark" ? 0.38 : 0.62;
 		gridMaterial.depthWrite = false;
 		grid.position.set(0, -1, 0);
+		grid.visible = this.visualOptions.showGrid;
 		scene.add(grid);
 		this.helperObjects.push(grid);
+		this.gridHelper = grid;
+	}
+
+	private syncGridVisibility(): void {
+		if (this.gridHelper) {
+			this.gridHelper.visible = this.visualOptions.showGrid;
+		}
+	}
+
+	private syncLinkVisibilityInScene(): void {
+		if (!this.graph) return;
+		const scene = (this.graph as any).scene() as THREE.Scene;
+		scene.traverse((object) => {
+			const graphObject = object as THREE.Object3D & { __graphObjType?: string };
+			if (graphObject.__graphObjType === "link") {
+				graphObject.visible = this.linksVisible;
+			}
+		});
 	}
 
 	private enableAutoRotate(): void {
@@ -534,6 +614,7 @@ export class GraphSceneRenderer {
 	}
 
 	setClusterRegions(regions: ClusterRegion[]): void {
+		this.currentClusterRegions = [...regions];
 		this.clearClusterObjects();
 		this.nodePathToClusterIdx.clear();
 		if (!this.graph || regions.length === 0) return;
@@ -674,6 +755,8 @@ export class GraphSceneRenderer {
 	}
 
 	private clearHelperObjects(): void {
+		this.axesHelper = null;
+		this.gridHelper = null;
 		if (!this.graph) {
 			this.helperObjects = [];
 			return;
@@ -731,7 +814,6 @@ export class GraphSceneRenderer {
 	}
 
 	private getLinkOpacity(link: GraphLink): number {
-		if (!this.linksVisible) return 0;
 		if (!this.selectedNodePath) return BASE_LINK_OPACITY;
 		return this.isHighlightedLink(link) ? HIGHLIGHT_LINK_OPACITY : DIMMED_LINK_OPACITY;
 	}

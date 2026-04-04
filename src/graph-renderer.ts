@@ -13,22 +13,23 @@ export class GraphRenderer {
 		container: HTMLElement,
 		onNodeSelect: (node: GraphNode | null) => void,
 		onNodeOpen: (node: GraphNode) => void,
-		visualOptions: GraphVisualOptions
+		visualOptions: GraphVisualOptions,
+		linksVisible: boolean
 	) {
 		this.container = container;
 		this.visualOptions = visualOptions;
+		this.linksVisible = linksVisible;
 		this.container.replaceChildren();
 
-		this.sceneLayer = document.createElement("div");
-		this.sceneLayer.className = "semantic-graph-scene-layer";
-		this.container.append(this.sceneLayer);
+		this.sceneLayer = this.container.createDiv({ cls: "semantic-graph-scene-layer" });
 		this.applyThemeClass();
 
 		this.sceneRenderer = new GraphSceneRenderer(
 			this.sceneLayer,
 			onNodeSelect,
 			onNodeOpen,
-			this.visualOptions
+			this.visualOptions,
+			this.linksVisible
 		);
 	}
 

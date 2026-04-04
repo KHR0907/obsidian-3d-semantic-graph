@@ -46,9 +46,7 @@ export class UmapReducer {
 			random,
 		});
 
-		umap.initializeFit(embeddings);
-
-		const totalEpochs = umap.getNEpochs();
+		const totalEpochs = umap.initializeFit(embeddings);
 		for (let i = 0; i < totalEpochs; i++) {
 			umap.step();
 			if (onProgress && i % 10 === 0) {

@@ -131,24 +131,22 @@ export class GraphInspectorPanel {
 
 		this.listEl.replaceChildren();
 		for (const node of items) {
-			const itemEl = document.createElement("li");
-			itemEl.className = "semantic-graph-inspector-link-item";
+			const itemEl = this.listEl.createEl("li", { cls: "semantic-graph-inspector-link-item" });
 
-			const buttonEl = document.createElement("button");
-			buttonEl.className = "semantic-graph-inspector-link-btn";
+			const buttonEl = itemEl.createEl("button", {
+				cls: "semantic-graph-inspector-link-btn",
+				text: node.name,
+			});
 			buttonEl.type = "button";
-			buttonEl.textContent = node.name;
 			buttonEl.addEventListener("click", () => {
 				this.selectedNode = node;
 				this.render();
 			});
 
-			const pathEl = document.createElement("div");
-			pathEl.className = "semantic-graph-inspector-link-path";
-			pathEl.textContent = node.path;
-
-			itemEl.append(buttonEl, pathEl);
-			this.listEl.append(itemEl);
+			itemEl.createDiv({
+				cls: "semantic-graph-inspector-link-path",
+				text: node.path,
+			});
 		}
 	}
 

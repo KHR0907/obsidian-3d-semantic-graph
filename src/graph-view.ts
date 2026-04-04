@@ -1,5 +1,5 @@
-import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
-import { canGenerateEmbeddings, GraphNode, GraphVisualOptions, PluginSettings } from "./types";
+import { ItemView, Notice, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
+import { canGenerateEmbeddings, clonePluginSettings, GraphNode, GraphVisualOptions, PluginSettings } from "./types";
 import { createSeededRandom } from "./seeded-rng";
 import { buildGraphData } from "./graph-data";
 import { createClusteredSphereLayout, buildClusterRegions } from "./clustered-sphere-layout";
@@ -9,13 +9,19 @@ export const VIEW_TYPE = "semantic-graph-3d";
 const MIN_SCENE_EXTENT = 960;
 const LAYOUT_RADIUS_RATIO = 0.45;
 const MIN_NODE_DISTANCE = 14;
-const SPHEREIZE_BASE_BLEND = 0.22;
-const PARTIAL_SPHEREIZE_WEIGHT = 0.6;
+const TOOLTIP_DELAY_MS = 150;
+const CLUSTERS_MODE_TOOLTIPS = {
+	on: "Clusters On",
+	off: "Clusters Off",
+	hover: "Clusters Hover",
+} as const;
+type ClustersMode = PluginSettings["showClusters"];
 
 export class SemanticGraphView extends ItemView {
 	private settings: PluginSettings;
 	private pluginDir: string;
-	private persistSettings: (settings: PluginSettings) => Promise<void>;
+	private getLatestSettings: () => PluginSettings;
+	private persistSettings: (settings: PluginSettings, sourceView?: SemanticGraphView) => Promise<void>;
 	private renderer: import("./graph-renderer").GraphRenderer | null = null;
 	private toolbar: HTMLElement | null = null;
 	private statusEl: HTMLElement | null = null;
@@ -25,16 +31,19 @@ export class SemanticGraphView extends ItemView {
 	private linksToggleBtn: HTMLButtonElement | null = null;
 	private gridToggleBtn: HTMLButtonElement | null = null;
 	private clustersToggleBtn: HTMLButtonElement | null = null;
+	private loadRequestId = 0;
 
 	constructor(
 		leaf: WorkspaceLeaf,
 		settings: PluginSettings,
 		pluginDir: string,
-		persistSettings: (settings: PluginSettings) => Promise<void>
+		getLatestSettings: () => PluginSettings,
+		persistSettings: (settings: PluginSettings, sourceView?: SemanticGraphView) => Promise<void>
 	) {
 		super(leaf);
-		this.settings = settings;
+		this.settings = clonePluginSettings(settings);
 		this.pluginDir = pluginDir;
+		this.getLatestSettings = getLatestSettings;
 		this.persistSettings = persistSettings;
 	}
 
@@ -48,15 +57,42 @@ export class SemanticGraphView extends ItemView {
 		container.addClass("semantic-graph-container");
 
 		this.toolbar = container.createDiv({ cls: "semantic-graph-toolbar" });
-		this.toolbar.createEl("button", { text: "Refresh", cls: "semantic-graph-btn" })
-			.addEventListener("click", () => this.loadGraph());
-		this.toolbar.createEl("button", { text: "Reset View", cls: "semantic-graph-btn" })
-			.addEventListener("click", () => this.renderer?.resetView());
+		const refreshBtn = this.toolbar.createEl("button", {
+			cls: "semantic-graph-btn semantic-graph-icon-btn",
+			attr: {
+				type: "button",
+				"aria-label": "Refresh graph",
+			},
+		});
+		setIcon(refreshBtn, "refresh-ccw");
+		this.setToolbarTooltip(refreshBtn, "Refresh");
+		refreshBtn.addEventListener("click", () => this.loadGraph());
+
+		const resetViewBtn = this.toolbar.createEl("button", {
+			cls: "semantic-graph-btn semantic-graph-icon-btn semantic-graph-icon-pair-btn",
+			attr: {
+				type: "button",
+				"aria-label": "Reset view",
+			},
+		});
+		const resetCameraIcon = resetViewBtn.createSpan({ cls: "semantic-graph-icon-slot" });
+		const resetRotateIcon = resetViewBtn.createSpan({ cls: "semantic-graph-icon-slot" });
+		setIcon(resetCameraIcon, "camera");
+		setIcon(resetRotateIcon, "rotate-ccw");
+		this.setToolbarTooltip(resetViewBtn, "Reset Camera View");
+		resetViewBtn.addEventListener("click", () => this.renderer?.resetView());
+
 		this.linksToggleBtn = this.toolbar.createEl("button", { cls: "semantic-graph-btn" });
 		this.linksToggleBtn.addEventListener("click", () => void this.toggleLinks());
 		this.gridToggleBtn = this.toolbar.createEl("button", { cls: "semantic-graph-btn" });
 		this.gridToggleBtn.addEventListener("click", () => void this.toggleGrid());
-		this.clustersToggleBtn = this.toolbar.createEl("button", { cls: "semantic-graph-btn" });
+		this.clustersToggleBtn = this.toolbar.createEl("button", {
+			cls: "semantic-graph-btn semantic-graph-icon-btn semantic-graph-clusters-btn",
+			attr: {
+				type: "button",
+				"aria-label": "Clusters mode",
+			},
+		});
 		this.clustersToggleBtn.addEventListener("click", () => void this.toggleClusters());
 		this.updateLinksToggleButton();
 		this.updateGridToggleButton();
@@ -84,15 +120,16 @@ export class SemanticGraphView extends ItemView {
 	}
 
 	updateSettings(settings: PluginSettings): void {
-		const previous = { ...this.settings };
-		this.settings = settings;
+		const previous = this.settings;
+		this.settings = clonePluginSettings(settings);
 		this.renderer?.setLinksVisible(this.settings.showLinks);
+		this.renderer?.setClustersMode(this.getClustersMode());
 		this.renderer?.updateVisualOptions(this.getVisualOptions());
 		this.updateLinksToggleButton();
 		this.updateGridToggleButton();
+		this.updateClustersToggleButton();
 
 		if (
-			previous.sphereizeData !== settings.sphereizeData ||
 			previous.projectionMethod !== settings.projectionMethod ||
 			previous.layoutSeed !== settings.layoutSeed
 		) {
@@ -107,14 +144,18 @@ export class SemanticGraphView extends ItemView {
 	private updateLinksToggleButton(): void {
 		if (!this.linksToggleBtn) return;
 
-		this.linksToggleBtn.setText(this.settings.showLinks ? "Links On" : "Links Off");
+		this.linksToggleBtn.empty();
+		setIcon(this.linksToggleBtn, "map");
+		this.setToolbarTooltip(this.linksToggleBtn, this.settings.showLinks ? "Links On" : "Links Off");
 		this.linksToggleBtn.classList.toggle("is-active", this.settings.showLinks);
 	}
 
 	private updateGridToggleButton(): void {
 		if (!this.gridToggleBtn) return;
 
-		this.gridToggleBtn.setText(this.settings.showGrid ? "Grid On" : "Grid Off");
+		this.gridToggleBtn.empty();
+		setIcon(this.gridToggleBtn, "layout-grid");
+		this.setToolbarTooltip(this.gridToggleBtn, this.settings.showGrid ? "Grid On" : "Grid Off");
 		this.gridToggleBtn.classList.toggle("is-active", this.settings.showGrid);
 	}
 
@@ -126,7 +167,7 @@ export class SemanticGraphView extends ItemView {
 
 		this.renderer?.setLinksVisible(this.settings.showLinks);
 		this.updateLinksToggleButton();
-		await this.persistSettings(this.settings);
+		await this.persistSettings(this.settings, this);
 	}
 
 	private async toggleGrid(): Promise<void> {
@@ -137,32 +178,45 @@ export class SemanticGraphView extends ItemView {
 
 		this.renderer?.updateVisualOptions(this.getVisualOptions());
 		this.updateGridToggleButton();
-		await this.persistSettings(this.settings);
+		await this.persistSettings(this.settings, this);
 	}
 
-	private getClustersMode(): "on" | "hover" | "off" {
-		const v = this.settings.showClusters;
+	private getClustersMode(settings: PluginSettings = this.settings): ClustersMode {
+		const v = settings.showClusters;
 		if (v === "on" || v === "hover" || v === "off") return v;
 		return "hover";
 	}
 
 	private updateClustersToggleButton(): void {
 		if (!this.clustersToggleBtn) return;
-		const labels = { on: "Clusters On", hover: "Clusters Hover", off: "Clusters Off" } as const;
-		this.clustersToggleBtn.setText(labels[this.getClustersMode()]);
-		this.clustersToggleBtn.classList.toggle("is-active", this.getClustersMode() !== "off");
+		const mode = this.getClustersMode();
+		this.clustersToggleBtn.empty();
+		setIcon(this.clustersToggleBtn, "layers");
+		this.setToolbarTooltip(this.clustersToggleBtn, CLUSTERS_MODE_TOOLTIPS[mode]);
+		this.clustersToggleBtn.setAttribute("aria-label", CLUSTERS_MODE_TOOLTIPS[mode]);
+		this.clustersToggleBtn.classList.toggle("is-active", mode === "on");
+		this.clustersToggleBtn.classList.toggle("is-hover", mode === "hover");
+		this.clustersToggleBtn.classList.toggle("is-off", mode === "off");
+	}
+
+	private setToolbarTooltip(element: HTMLElement, text: string): void {
+		setTooltip(element, text, { delay: TOOLTIP_DELAY_MS });
 	}
 
 	private async toggleClusters(): Promise<void> {
 		const cycle = { on: "hover", hover: "off", off: "on" } as const;
+		await this.setClustersMode(cycle[this.getClustersMode()]);
+	}
+
+	private async setClustersMode(mode: ClustersMode): Promise<void> {
 		this.settings = {
 			...this.settings,
-			showClusters: cycle[this.getClustersMode()],
+			showClusters: mode,
 		};
 
 		this.renderer?.setClustersMode(this.settings.showClusters);
 		this.updateClustersToggleButton();
-		await this.persistSettings(this.settings);
+		await this.persistSettings(this.settings, this);
 	}
 
 	private openNote(path: string): void {
@@ -170,8 +224,18 @@ export class SemanticGraphView extends ItemView {
 		if (file) this.app.workspace.getLeaf(false).openFile(file as any);
 	}
 
-	private async reduceEmbeddings(vectors: number[][]): Promise<number[][]> {
-		if (this.settings.projectionMethod === "pca") {
+	private syncSettingsFromSource(): void {
+		this.settings = clonePluginSettings(this.getLatestSettings());
+		this.renderer?.setLinksVisible(this.settings.showLinks);
+		this.renderer?.setClustersMode(this.getClustersMode(this.settings));
+		this.renderer?.updateVisualOptions(this.getVisualOptions(this.settings));
+		this.updateLinksToggleButton();
+		this.updateGridToggleButton();
+		this.updateClustersToggleButton();
+	}
+
+	private async reduceEmbeddings(vectors: number[][], settings: PluginSettings): Promise<number[][]> {
+		if (settings.projectionMethod === "pca") {
 			this.setStatus("Running PCA...");
 			const { PcaReducer } = await import("./pca-reducer");
 			const reducer = new PcaReducer();
@@ -183,9 +247,9 @@ export class SemanticGraphView extends ItemView {
 		this.setStatus("Running UMAP...");
 		const { UmapReducer } = await import("./umap-reducer");
 		const reducer = new UmapReducer({
-			nNeighbors: this.settings.umapNNeighbors,
-			minDist: this.settings.umapMinDist,
-			seed: this.settings.layoutSeed,
+			nNeighbors: settings.umapNNeighbors,
+			minDist: settings.umapMinDist,
+			seed: settings.layoutSeed,
 		});
 		return reducer.reduce(vectors, (epoch, total) => {
 			this.setStatus(`UMAP: ${epoch}/${total}`);
@@ -194,43 +258,44 @@ export class SemanticGraphView extends ItemView {
 
 	async loadGraph(): Promise<void> {
 		if (!this.graphStage) return;
+		this.syncSettingsFromSource();
+		const settings = clonePluginSettings(this.settings);
+		const requestId = ++this.loadRequestId;
+		const isCurrentRequest = () => requestId === this.loadRequestId;
 
 		try {
 			this.setStatus("Building graph...");
-			const graphData = buildGraphData(this.app, this.settings);
+			const graphData = buildGraphData(this.app, settings);
 			const layoutRadius = this.getLayoutRadius();
 
 			if (graphData.nodes.length === 0) {
-				this.showError("No markdown files found in vault.");
+				if (isCurrentRequest()) {
+					this.showError("No markdown files found in vault.");
+				}
 				return;
 			}
 
-			const spherePositions = this.createSphereLayout(graphData.nodes, layoutRadius);
+			const spherePositions = this.createSphereLayout(graphData.nodes, layoutRadius, settings);
 			let finalPositions = spherePositions;
 			let clusterResult: import("./clustered-sphere-layout").ClusteredSphereResult | null = null;
 
-			if (canGenerateEmbeddings(this.settings)) {
+			if (canGenerateEmbeddings(settings)) {
 				try {
-					const embeddings = this.settings.uploadedVectorsFileName.trim()
+					const embeddings = settings.uploadedVectorsFileName.trim()
 						? await this.loadUploadedEmbeddingVectors()
-						: await this.loadProviderEmbeddings();
+						: await this.loadProviderEmbeddings(settings);
+					if (!isCurrentRequest()) return;
 
 					if (embeddings.size >= 3) {
 						const paths = Array.from(embeddings.keys());
 						const vectors = paths.map((p) => embeddings.get(p)!);
-						const coords = await this.reduceEmbeddings(vectors);
+						const coords = await this.reduceEmbeddings(vectors, settings);
+						if (!isCurrentRequest()) return;
 
 						const semanticPositions = new Map<string, [number, number, number]>();
 						paths.forEach((p, i) => semanticPositions.set(p, coords[i] as [number, number, number]));
 
-						finalPositions = this.settings.sphereizeData
-							? this.sphereizePositions(
-								graphData.nodes,
-								spherePositions,
-								semanticPositions,
-								layoutRadius
-							)
-							: this.createSemanticLayout(
+						finalPositions = this.createSemanticLayout(
 								graphData.nodes,
 								spherePositions,
 								semanticPositions,
@@ -239,22 +304,23 @@ export class SemanticGraphView extends ItemView {
 					} else {
 						this.setStatus("Using clustered sphere layout...");
 						clusterResult = createClusteredSphereLayout(
-							graphData.nodes, layoutRadius, this.settings.layoutSeed
+							graphData.nodes, layoutRadius, settings.layoutSeed
 						);
 						finalPositions = clusterResult.positions;
 					}
 				} catch (embErr: any) {
+					if (!isCurrentRequest()) return;
 					console.warn("Embedding step failed:", embErr?.message);
 					this.setStatus("Embedding failed, using clustered sphere layout...");
 					clusterResult = createClusteredSphereLayout(
-						graphData.nodes, layoutRadius, this.settings.layoutSeed
+						graphData.nodes, layoutRadius, settings.layoutSeed
 					);
 					finalPositions = clusterResult.positions;
 				}
 			} else {
 				this.setStatus("Using clustered sphere layout...");
 				clusterResult = createClusteredSphereLayout(
-					graphData.nodes, layoutRadius, this.settings.layoutSeed
+					graphData.nodes, layoutRadius, settings.layoutSeed
 				);
 				finalPositions = clusterResult.positions;
 			}
@@ -270,27 +336,32 @@ export class SemanticGraphView extends ItemView {
 			this.enforceMinDistance(
 				finalPositions,
 				MIN_NODE_DISTANCE,
-				createSeededRandom(this.settings.layoutSeed)
+				createSeededRandom(settings.layoutSeed)
 			);
 			this.applyPositions(graphData.nodes, finalPositions);
 
 			this.setStatus(`${graphData.nodes.length} notes, ${graphData.links.length} links`);
+			if (!isCurrentRequest()) return;
 
 			this.renderer?.dispose();
 			const { GraphRenderer } = await import("./graph-renderer");
+			if (!isCurrentRequest()) return;
 			this.renderer = new GraphRenderer(
 				this.graphStage,
 				() => {},
 				(node) => this.openNote(node.path),
-				this.getVisualOptions()
+				this.getVisualOptions(settings),
+				settings.showLinks
 			);
 			this.renderer.render(graphData);
-			this.renderer.setLinksVisible(this.settings.showLinks);
+			this.renderer.setLinksVisible(settings.showLinks);
 			const regions = clusterResult
 				? clusterResult.regions
 				: buildClusterRegions(graphData.nodes);
 			this.renderer.setClusterRegions(regions);
+			this.renderer.setClustersMode(this.getClustersMode(settings));
 		} catch (err: any) {
+			if (!isCurrentRequest()) return;
 			console.error("Semantic Graph error:", err);
 			const msg = err?.message || String(err);
 			this.showError(`Error: ${msg}`);
@@ -298,10 +369,10 @@ export class SemanticGraphView extends ItemView {
 		}
 	}
 
-	private async loadProviderEmbeddings(): Promise<Map<string, number[]>> {
+	private async loadProviderEmbeddings(settings: PluginSettings): Promise<Map<string, number[]>> {
 		this.setStatus("Generating embeddings...");
 		const { EmbeddingService } = await import("./embedding");
-		const embeddingService = new EmbeddingService(this.app, this.settings, this.pluginDir);
+		const embeddingService = new EmbeddingService(this.app, settings, this.pluginDir);
 		return embeddingService.getEmbeddings((current, total) => {
 			this.setStatus(`Embedding... ${current}/${total}`);
 		});
@@ -315,7 +386,8 @@ export class SemanticGraphView extends ItemView {
 
 	private createSphereLayout(
 		nodes: GraphNode[],
-		targetRadius: number
+		targetRadius: number,
+		settings: PluginSettings
 	): Map<string, [number, number, number]> {
 		const positions = new Map<string, [number, number, number]>();
 		const orderedNodes = [...nodes].sort((a, b) => {
@@ -338,7 +410,7 @@ export class SemanticGraphView extends ItemView {
 			const y = 1 - 2 * t;
 			const ringRadius = Math.sqrt(Math.max(0, 1 - y * y));
 			const theta = goldenAngle * i;
-			const radialT = this.hashToUnitInterval(`${node.path}:${this.settings.layoutSeed}:radius`);
+			const radialT = this.hashToUnitInterval(`${node.path}:${settings.layoutSeed}:radius`);
 			const radius = targetRadius * Math.cbrt(radialT);
 
 			positions.set(node.path, [
@@ -349,85 +421,6 @@ export class SemanticGraphView extends ItemView {
 		}
 
 		return positions;
-	}
-
-	private sphereizePositions(
-		nodes: GraphNode[],
-		spherePositions: Map<string, [number, number, number]>,
-		semanticPositions: Map<string, [number, number, number]>,
-		targetRadius: number
-	): Map<string, [number, number, number]> {
-		const sphereized = new Map<string, [number, number, number]>();
-		const centeredPositions = new Map<string, [number, number, number]>();
-		const available = nodes
-			.map((node) => semanticPositions.get(node.path))
-			.filter((pos): pos is [number, number, number] => !!pos);
-
-		if (available.length === 0) return sphereized;
-
-		const centroid: [number, number, number] = [0, 0, 0];
-		for (const [x, y, z] of available) {
-			centroid[0] += x;
-			centroid[1] += y;
-			centroid[2] += z;
-		}
-		centroid[0] /= available.length;
-		centroid[1] /= available.length;
-		centroid[2] /= available.length;
-
-		for (const node of nodes) {
-			const semanticPos = semanticPositions.get(node.path);
-			if (!semanticPos) continue;
-
-			centeredPositions.set(node.path, [
-				semanticPos[0] - centroid[0],
-				semanticPos[1] - centroid[1],
-				semanticPos[2] - centroid[2],
-			]);
-		}
-
-		this.scalePositions(centeredPositions, targetRadius * 0.72);
-
-		for (const node of nodes) {
-			const spherePos = spherePositions.get(node.path) ?? [0, 0, targetRadius];
-			const centeredPos = centeredPositions.get(node.path);
-			if (!centeredPos) {
-				sphereized.set(node.path, [...spherePos]);
-				continue;
-			}
-			const length = this.vectorLength(centeredPos);
-
-			const semanticDirection: [number, number, number] =
-				length === 0
-					? [0, 0, 1]
-					: [centeredPos[0] / length, centeredPos[1] / length, centeredPos[2] / length];
-
-			const sphereLength = this.vectorLength(spherePos);
-			const sphereDirection: [number, number, number] =
-				sphereLength === 0
-					? [0, 0, 1]
-					: [spherePos[0] / sphereLength, spherePos[1] / sphereLength, spherePos[2] / sphereLength];
-
-			const blended: [number, number, number] = [
-				semanticDirection[0] * (1 - SPHEREIZE_BASE_BLEND) + sphereDirection[0] * SPHEREIZE_BASE_BLEND,
-				semanticDirection[1] * (1 - SPHEREIZE_BASE_BLEND) + sphereDirection[1] * SPHEREIZE_BASE_BLEND,
-				semanticDirection[2] * (1 - SPHEREIZE_BASE_BLEND) + sphereDirection[2] * SPHEREIZE_BASE_BLEND,
-			];
-			const blendedLength = this.vectorLength(blended) || 1;
-			const sphereSurfacePos: [number, number, number] = [
-				(blended[0] / blendedLength) * targetRadius,
-				(blended[1] / blendedLength) * targetRadius,
-				(blended[2] / blendedLength) * targetRadius,
-			];
-
-			sphereized.set(node.path, [
-				centeredPos[0] * (1 - PARTIAL_SPHEREIZE_WEIGHT) + sphereSurfacePos[0] * PARTIAL_SPHEREIZE_WEIGHT,
-				centeredPos[1] * (1 - PARTIAL_SPHEREIZE_WEIGHT) + sphereSurfacePos[1] * PARTIAL_SPHEREIZE_WEIGHT,
-				centeredPos[2] * (1 - PARTIAL_SPHEREIZE_WEIGHT) + sphereSurfacePos[2] * PARTIAL_SPHEREIZE_WEIGHT,
-			]);
-		}
-
-		return sphereized;
 	}
 
 	private createSemanticLayout(
@@ -511,14 +504,14 @@ export class SemanticGraphView extends ItemView {
 		return (this.hashPath(value) + 0.5) / 4294967296;
 	}
 
-	private getVisualOptions(): GraphVisualOptions {
+	private getVisualOptions(settings: PluginSettings = this.settings): GraphVisualOptions {
 		return {
-			sceneTheme: this.settings.sceneTheme,
-			nodeOpacity: this.settings.nodeOpacity,
-			nodeSizeScale: this.settings.nodeSizeScale,
-			dragSensitivity: this.settings.dragSensitivity,
-			showGrid: this.settings.showGrid,
-			autoOrbitSpeed: this.settings.autoOrbitSpeed,
+			sceneTheme: settings.sceneTheme,
+			nodeOpacity: settings.nodeOpacity,
+			nodeSizeScale: settings.nodeSizeScale,
+			dragSensitivity: settings.dragSensitivity,
+			showGrid: settings.showGrid,
+			autoOrbitSpeed: settings.autoOrbitSpeed,
 			sceneExtent: this.getSceneExtent(),
 		};
 	}

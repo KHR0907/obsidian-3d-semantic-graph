@@ -1,7 +1,7 @@
 import { Plugin, WorkspaceLeaf } from "obsidian";
 import {
+	clonePluginSettings,
 	createDefaultSettings,
-	EmbeddingProvider,
 	isPresetEmbeddingModel,
 	PluginSettings,
 } from "./types";
@@ -17,11 +17,12 @@ export default class SemanticGraphPlugin extends Plugin {
 		this.registerView(VIEW_TYPE, (leaf: WorkspaceLeaf) => {
 			return new SemanticGraphView(
 				leaf,
-				this.settings,
+				clonePluginSettings(this.settings),
 				this.manifest.dir!,
-				async (nextSettings: PluginSettings) => {
-					this.settings = nextSettings;
-					await this.saveSettings();
+				() => clonePluginSettings(this.settings),
+				async (nextSettings: PluginSettings, sourceView?: SemanticGraphView) => {
+					this.settings = clonePluginSettings(nextSettings);
+					await this.saveSettings(sourceView);
 				}
 			);
 		});
@@ -41,63 +42,44 @@ export default class SemanticGraphPlugin extends Plugin {
 		this.addSettingTab(new SemanticGraphSettingTab(this.app, this));
 	}
 
-	onunload() {
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE);
-	}
-
 	async loadSettings() {
 		const loadedData = await this.loadData();
 		const loaded = (loadedData ?? {}) as Partial<PluginSettings> & {
 			nodeAssetMode?: unknown;
 			openaiApiKey?: unknown;
-			embeddingProvider?: unknown;
-			embeddingApiKey?: unknown;
-			embeddingModel?: unknown;
-			useCustomEmbeddingModel?: unknown;
-			customEmbeddingModel?: unknown;
-			customEmbeddingEndpoint?: unknown;
 		};
-		this.settings = Object.assign({}, createDefaultSettings(), loaded);
+		this.settings = clonePluginSettings(Object.assign({}, createDefaultSettings(), loaded));
 
+		// Migrate legacy openaiApiKey field
 		if (typeof loaded.openaiApiKey === "string" && !this.settings.embeddingApiKey) {
 			this.settings.embeddingApiKey = loaded.openaiApiKey;
 		}
 
-		const provider = loaded.embeddingProvider;
-		if (provider !== "openai" && provider !== "gemini" && provider !== "cohere" && provider !== "voyage" && provider !== "custom") {
-			this.settings.embeddingProvider = "openai";
-		}
+		// Force provider to openai
+		this.settings.embeddingProvider = "openai";
 
-		if (this.settings.embeddingProvider === "custom") {
-			this.settings.embeddingProvider = "openai";
+		if (!isPresetEmbeddingModel("openai", this.settings.embeddingModel)) {
 			this.settings.embeddingModel = "text-embedding-3-large";
-			this.settings.useCustomEmbeddingModel = false;
 		}
 
-		if (
-			typeof loaded.embeddingModel === "string" &&
-			typeof loaded.useCustomEmbeddingModel !== "boolean" &&
-			typeof loaded.customEmbeddingModel !== "string"
-		) {
-			if (isPresetEmbeddingModel(this.settings.embeddingProvider as EmbeddingProvider, loaded.embeddingModel)) {
-				this.settings.embeddingModel = loaded.embeddingModel;
-			} else {
-				this.settings.embeddingProvider = "openai";
-				this.settings.embeddingModel = "text-embedding-3-large";
-				this.settings.useCustomEmbeddingModel = false;
-			}
-		}
-
-		delete (this.settings as PluginSettings & { nodeAssetMode?: unknown; openaiApiKey?: unknown }).nodeAssetMode;
-		delete (this.settings as PluginSettings & { nodeAssetMode?: unknown; openaiApiKey?: unknown }).openaiApiKey;
+		// Clean up legacy fields
+		const s = this.settings as unknown as Record<string, unknown>;
+		delete s.nodeAssetMode;
+		delete s.openaiApiKey;
+		delete s.useCustomEmbeddingModel;
+		delete s.customEmbeddingModel;
+		delete s.customEmbeddingEndpoint;
+		delete s.sphereizeData;
 	}
 
-	async saveSettings() {
-		await this.saveData(this.settings);
+	async saveSettings(_sourceView?: SemanticGraphView) {
+		const nextSettings = clonePluginSettings(this.settings);
+		this.settings = nextSettings;
+		await this.saveData(nextSettings);
 		// Update existing views with new settings
 		this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach((leaf) => {
 			if (leaf.view instanceof SemanticGraphView) {
-				leaf.view.updateSettings(this.settings);
+				leaf.view.updateSettings(clonePluginSettings(nextSettings));
 			}
 		});
 	}

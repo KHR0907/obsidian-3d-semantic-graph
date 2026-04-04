@@ -16,20 +16,13 @@ export class GraphStageOverlay {
 		this.container = container;
 		this.container.classList.add("semantic-graph-overlay-layer");
 
-		this.cardEl = document.createElement("div");
-		this.cardEl.className = "semantic-graph-hover-card";
+		this.cardEl = this.container.createDiv({ cls: "semantic-graph-hover-card" });
 
-		this.titleEl = document.createElement("div");
-		this.titleEl.className = "semantic-graph-hover-title";
+		this.titleEl = this.cardEl.createDiv({ cls: "semantic-graph-hover-title" });
 
-		this.pathEl = document.createElement("div");
-		this.pathEl.className = "semantic-graph-hover-path";
+		this.pathEl = this.cardEl.createDiv({ cls: "semantic-graph-hover-path" });
 
-		this.metaEl = document.createElement("div");
-		this.metaEl.className = "semantic-graph-hover-meta";
-
-		this.cardEl.append(this.titleEl, this.pathEl, this.metaEl);
-		this.container.append(this.cardEl);
+		this.metaEl = this.cardEl.createDiv({ cls: "semantic-graph-hover-meta" });
 	}
 
 	show(info: HoverInfo): void {

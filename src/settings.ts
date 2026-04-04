@@ -1,12 +1,15 @@
-import { App, Notice, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, normalizePath, PluginSettingTab, Setting, TFile } from "obsidian";
 import SemanticGraphPlugin from "./main";
+import { EmbeddingService } from "./embedding";
 import {
+	clonePluginSettings,
 	createDefaultSettings,
 	EMBEDDING_PROVIDER_LABELS,
 	generateRandomLayoutSeed,
+	PluginSettings,
 	PRESET_EMBEDDING_MODELS,
 } from "./types";
-import { UPLOADED_VECTORS_FILE } from "./uploaded-vectors";
+import { serializeUploadedVectors, UPLOADED_VECTORS_FILE } from "./uploaded-vectors";
 
 export class SemanticGraphSettingTab extends PluginSettingTab {
 	plugin: SemanticGraphPlugin;
@@ -33,8 +36,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.embeddingApiKey)
 					.then((t) => (t.inputEl.type = "password"))
 					.onChange(async (value) => {
-						this.plugin.settings.embeddingApiKey = value.trim();
-						await this.plugin.saveSettings();
+						await this.patchSettings({ embeddingApiKey: value.trim() });
 					})
 			);
 
@@ -42,14 +44,13 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			.setName("Embedding Model")
 			.setDesc("Choose an OpenAI embedding model.")
 			.addDropdown((dropdown) =>
-				this.addProviderModelOptions(dropdown)
+				this.addEmbeddingModelOptions(dropdown)
 					.setValue(this.getSelectedEmbeddingOptionValue())
 					.onChange(async (value) => {
-						const { provider, model } = this.parseEmbeddingOptionValue(value);
-						this.plugin.settings.embeddingProvider = provider;
-						this.plugin.settings.embeddingModel = model;
-						this.plugin.settings.useCustomEmbeddingModel = false;
-						await this.plugin.saveSettings();
+						await this.patchSettings({
+							embeddingProvider: "openai",
+							embeddingModel: value,
+						});
 					})
 			);
 
@@ -58,8 +59,9 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			.setDesc("Use uploaded vectors instead of API embeddings.")
 			.addButton((button) =>
 				button
-					.setButtonText("Example")
-					.onClick(() => this.downloadExampleJson())
+					.setButtonText("Export")
+					.setTooltip("Download vectors in the uploaded-vectors JSON format")
+					.onClick(() => void this.exportVectorsJson())
 			)
 			.addButton((button) =>
 				button
@@ -77,8 +79,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setIcon("cross")
 					.setTooltip("Clear uploaded vectors reference")
 					.onClick(async () => {
-						this.plugin.settings.uploadedVectorsFileName = "";
-						await this.plugin.saveSettings();
+						await this.patchSettings({ uploadedVectorsFileName: "" });
 						this.display();
 					})
 			);
@@ -95,8 +96,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.addOption("tag", "First Tag")
 					.setValue(this.plugin.settings.nodeColorBy)
 					.onChange(async (value: "folder" | "tag") => {
-						this.plugin.settings.nodeColorBy = value;
-						await this.plugin.saveSettings();
+						await this.patchSettings({ nodeColorBy: value });
 					})
 			);
 
@@ -109,8 +109,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.addOption("pca", "PCA")
 					.setValue(this.plugin.settings.projectionMethod)
 					.onChange(async (value: "umap" | "pca") => {
-						this.plugin.settings.projectionMethod = value;
-						await this.plugin.saveSettings();
+						await this.patchSettings({ projectionMethod: value });
 					})
 			);
 
@@ -122,8 +121,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setButtonText("Random")
 					.onClick(async () => {
 						const nextSeed = generateRandomLayoutSeed();
-						this.plugin.settings.layoutSeed = nextSeed;
-						await this.plugin.saveSettings();
+						await this.patchSettings({ layoutSeed: nextSeed });
 						this.display();
 					})
 			)
@@ -134,20 +132,9 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.then((t) => (t.inputEl.type = "number"))
 					.onChange(async (value) => {
 						const parsed = Number.parseInt(value, 10);
-						this.plugin.settings.layoutSeed = Number.isFinite(parsed) ? parsed : generateRandomLayoutSeed();
-						await this.plugin.saveSettings();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Sphereize Data")
-			.setDesc("Project reduced embedding coordinates toward a sphere surface. Turn off to keep points distributed inside the 3D volume. Default: Off.")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.sphereizeData)
-					.onChange(async (value) => {
-						this.plugin.settings.sphereizeData = value;
-						await this.plugin.saveSettings();
+						await this.patchSettings({
+							layoutSeed: Number.isFinite(parsed) ? parsed : generateRandomLayoutSeed(),
+						});
 					})
 			);
 
@@ -158,8 +145,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.showLinks)
 					.onChange(async (value) => {
-						this.plugin.settings.showLinks = value;
-						await this.plugin.saveSettings();
+						await this.patchSettings({ showLinks: value });
 					})
 			);
 
@@ -170,8 +156,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.showGrid)
 					.onChange(async (value) => {
-						this.plugin.settings.showGrid = value;
-						await this.plugin.saveSettings();
+						await this.patchSettings({ showGrid: value });
 					})
 			);
 
@@ -186,8 +171,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.addOption("light", "Light")
 					.setValue(this.plugin.settings.sceneTheme)
 					.onChange(async (value: "dark" | "light") => {
-						this.plugin.settings.sceneTheme = value;
-						await this.plugin.saveSettings();
+						await this.patchSettings({ sceneTheme: value });
 					})
 			);
 
@@ -200,8 +184,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.nodeOpacity)
 					.setDynamicTooltip()
 					.onChange(async (value) => {
-						this.plugin.settings.nodeOpacity = value;
-						await this.plugin.saveSettings();
+						await this.patchSettings({ nodeOpacity: value });
 					})
 			);
 
@@ -214,8 +197,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.nodeSizeScale)
 					.setDynamicTooltip()
 					.onChange(async (value) => {
-						this.plugin.settings.nodeSizeScale = value;
-						await this.plugin.saveSettings();
+						await this.patchSettings({ nodeSizeScale: value });
 					})
 			);
 
@@ -228,8 +210,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.dragSensitivity)
 					.setDynamicTooltip()
 					.onChange(async (value) => {
-						this.plugin.settings.dragSensitivity = value;
-						await this.plugin.saveSettings();
+						await this.patchSettings({ dragSensitivity: value });
 					})
 			);
 
@@ -242,8 +223,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.autoOrbitSpeed)
 					.setDynamicTooltip()
 					.onChange(async (value) => {
-						this.plugin.settings.autoOrbitSpeed = value;
-						await this.plugin.saveSettings();
+						await this.patchSettings({ autoOrbitSpeed: value });
 					})
 			);
 
@@ -255,11 +235,12 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setPlaceholder("templates, daily-notes")
 					.setValue(this.plugin.settings.excludeFolders.join(", "))
 					.onChange(async (value) => {
-						this.plugin.settings.excludeFolders = value
-							.split(",")
-							.map((s) => s.trim())
-							.filter((s) => s.length > 0);
-						await this.plugin.saveSettings();
+						await this.patchSettings({
+							excludeFolders: value
+								.split(",")
+								.map((s) => s.trim())
+								.filter((s) => s.length > 0),
+						});
 					})
 			);
 
@@ -275,8 +256,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.umapNNeighbors)
 					.setDynamicTooltip()
 					.onChange(async (value) => {
-						this.plugin.settings.umapNNeighbors = value;
-						await this.plugin.saveSettings();
+						await this.patchSettings({ umapNNeighbors: value });
 					})
 			);
 
@@ -289,8 +269,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.umapMinDist)
 					.setDynamicTooltip()
 					.onChange(async (value) => {
-						this.plugin.settings.umapMinDist = value;
-						await this.plugin.saveSettings();
+						await this.patchSettings({ umapMinDist: value });
 					})
 			);
 
@@ -306,43 +285,39 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.setWarning()
 					.onClick(async () => {
 						const apiKey = this.plugin.settings.embeddingApiKey;
-						this.plugin.settings = { ...createDefaultSettings(), embeddingApiKey: apiKey };
-						await this.plugin.saveSettings();
+						await this.replaceSettings({
+							...createDefaultSettings(),
+							embeddingApiKey: apiKey,
+						});
 						this.display();
 					})
 			);
 	}
 
-	private addProviderModelOptions(dropdown: import("obsidian").DropdownComponent) {
+	private async patchSettings(patch: Partial<PluginSettings>): Promise<void> {
+		this.plugin.settings = {
+			...clonePluginSettings(this.plugin.settings),
+			...patch,
+		};
+		await this.plugin.saveSettings();
+	}
+
+	private async replaceSettings(settings: PluginSettings): Promise<void> {
+		this.plugin.settings = clonePluginSettings(settings);
+		await this.plugin.saveSettings();
+	}
+
+	private addEmbeddingModelOptions(dropdown: import("obsidian").DropdownComponent) {
 		PRESET_EMBEDDING_MODELS.openai.forEach((model) => {
-			dropdown.addOption(this.toEmbeddingOptionValue("openai", model), `${EMBEDDING_PROVIDER_LABELS.openai} - ${model}`);
+			dropdown.addOption(model, `${EMBEDDING_PROVIDER_LABELS.openai} - ${model}`);
 		});
 		return dropdown;
 	}
 
 	private getSelectedEmbeddingOptionValue(): string {
-		const model = PRESET_EMBEDDING_MODELS.openai.includes(this.plugin.settings.embeddingModel)
+		return PRESET_EMBEDDING_MODELS.openai.includes(this.plugin.settings.embeddingModel)
 			? this.plugin.settings.embeddingModel
 			: PRESET_EMBEDDING_MODELS.openai[0];
-		return this.toEmbeddingOptionValue("openai", model);
-	}
-
-	private toEmbeddingOptionValue(
-		provider: Exclude<typeof this.plugin.settings.embeddingProvider, "custom">,
-		model: string
-	): string {
-		return `${provider}::${model}`;
-	}
-
-	private parseEmbeddingOptionValue(value: string): {
-		provider: Exclude<typeof this.plugin.settings.embeddingProvider, "custom">;
-		model: string;
-	} {
-		const [provider, ...modelParts] = value.split("::");
-		return {
-			provider: provider as Exclude<typeof this.plugin.settings.embeddingProvider, "custom">,
-			model: modelParts.join("::"),
-		};
 	}
 
 	private async uploadVectorsJson(): Promise<void> {
@@ -357,8 +332,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 				JSON.parse(raw);
 				const path = `${this.plugin.manifest.dir}/${UPLOADED_VECTORS_FILE}`;
 				await this.app.vault.adapter.write(path, raw);
-				this.plugin.settings.uploadedVectorsFileName = file.name;
-				await this.plugin.saveSettings();
+				await this.patchSettings({ uploadedVectorsFileName: file.name });
 				this.display();
 				new Notice("Uploaded vectors JSON saved.");
 			} catch (error) {
@@ -368,34 +342,74 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 		input.click();
 	}
 
-	private downloadExampleJson(): void {
-		const blob = new Blob([this.getUploadedVectorsExampleJson()], { type: "application/json" });
+	private async exportVectorsJson(): Promise<void> {
+		try {
+			const uploadedPath = `${this.plugin.manifest.dir}/${UPLOADED_VECTORS_FILE}`;
+			const adapter = this.app.vault.adapter;
+			let raw: string;
+			let fileName: string;
+			let noticeMessage: string;
+
+			if (await adapter.exists(uploadedPath)) {
+				raw = await adapter.read(uploadedPath);
+				fileName = this.plugin.settings.uploadedVectorsFileName || UPLOADED_VECTORS_FILE;
+				noticeMessage = "Existing uploaded vectors exported.";
+			} else {
+				if (this.plugin.settings.embeddingApiKey.trim()) {
+					new Notice("Generating vectors JSON...");
+					const service = new EmbeddingService(this.app, this.plugin.settings, this.plugin.manifest.dir!);
+					const embeddings = await service.getEmbeddings();
+					raw = serializeUploadedVectors(embeddings.entries());
+					fileName = "exported-vectors.json";
+					noticeMessage = "Generated vectors exported.";
+				} else {
+					raw = this.getUploadedVectorsTemplateJson();
+					fileName = "vectors-template.json";
+					noticeMessage = "Template vectors JSON exported.";
+				}
+			}
+
+			this.downloadJsonFile(fileName, raw);
+			const vaultPath = await this.writeVectorsPreviewFile(fileName, raw);
+			new Notice(`${noticeMessage} Created ${vaultPath} in the vault.`);
+		} catch (error) {
+			new Notice(`Failed to extract vectors JSON: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	private getUploadedVectorsTemplateJson(): string {
+		const entries = this.app.vault
+			.getMarkdownFiles()
+			.filter((file) => {
+				return !this.plugin.settings.excludeFolders.some(
+					(folder) => file.path.startsWith(`${folder}/`) || file.path === folder
+				);
+			})
+			.map((file) => [file.path, { embedding: [] as number[] }] as const);
+		return JSON.stringify({ entries: Object.fromEntries(entries) }, null, 2);
+	}
+
+	private downloadJsonFile(fileName: string, raw: string): void {
+		const blob = new Blob([raw], { type: "application/json" });
 		const url = URL.createObjectURL(blob);
 		const anchor = document.createElement("a");
 		anchor.href = url;
-		anchor.download = "vectors-example.json";
+		anchor.download = fileName;
 		anchor.click();
 		URL.revokeObjectURL(url);
-		new Notice("Example JSON downloaded.");
 	}
 
-	private getUploadedVectorsExampleJson(): string {
-		return JSON.stringify(
-			{
-				entries: {
-					"folder/note-a.md": {
-						embedding: [0.12, -0.48, 0.91],
-					},
-					"folder/note-b.md": {
-						embedding: [-0.33, 0.27, 0.54],
-					},
-					"folder/note-c.md": {
-						embedding: [0.78, 0.11, -0.22],
-					},
-				},
-			},
-			null,
-			2
-		);
+	private async writeVectorsPreviewFile(fileName: string, raw: string): Promise<string> {
+		const vaultPath = normalizePath(fileName);
+		const existing = this.app.vault.getAbstractFileByPath(vaultPath);
+		if (existing instanceof TFile) {
+			await this.app.vault.modify(existing, raw);
+			return vaultPath;
+		}
+		if (existing) {
+			throw new Error(`Cannot write exported vectors to "${vaultPath}" because a folder already exists there.`);
+		}
+		await this.app.vault.create(vaultPath, raw);
+		return vaultPath;
 	}
 }
