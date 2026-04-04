@@ -2,8 +2,17 @@ import { App } from "obsidian";
 
 export const UPLOADED_VECTORS_FILE = "uploaded-vectors.json";
 
-interface UploadedVectorsJson {
+export interface UploadedVectorsJson {
 	entries: Record<string, { embedding: number[] }>;
+}
+
+export function serializeUploadedVectors(vectors: Iterable<[string, number[]]>): string {
+	const entries = Object.fromEntries(
+		Array.from(vectors)
+			.sort(([pathA], [pathB]) => pathA.localeCompare(pathB))
+			.map(([pathKey, embedding]) => [pathKey, { embedding }])
+	);
+	return JSON.stringify({ entries } satisfies UploadedVectorsJson, null, 2);
 }
 
 export async function readUploadedVectors(

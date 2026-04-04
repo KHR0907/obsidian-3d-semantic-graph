@@ -25,6 +25,53 @@
 	font-size: 12px;
 }
 
+.semantic-graph-icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 28px;
+	padding: 0;
+	--icon-size: 16px;
+}
+
+.semantic-graph-icon-pair-btn {
+	width: auto;
+	gap: 4px;
+	padding: 0 8px;
+}
+
+.semantic-graph-icon-slot {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.semantic-graph-clusters-btn {
+	position: relative;
+	overflow: hidden;
+}
+
+.semantic-graph-clusters-btn.is-hover {
+	border-color: color-mix(in srgb, var(--interactive-accent) 48%, var(--background-modifier-border) 52%);
+	background:
+		linear-gradient(
+			to right,
+			var(--interactive-normal) 0 50%,
+			var(--interactive-accent) 50% 100%
+		);
+	color: var(--text-normal);
+}
+
+.semantic-graph-clusters-btn.is-hover:hover {
+	background:
+		linear-gradient(
+			to right,
+			var(--interactive-hover) 0 50%,
+			color-mix(in srgb, var(--interactive-accent) 88%, white 12%) 50% 100%
+		);
+}
+
 .semantic-graph-btn:hover {
 	background: var(--interactive-hover);
 }
