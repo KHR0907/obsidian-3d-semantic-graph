@@ -2,7 +2,7 @@
 
 Obsidian 데스크톱 전용 플러그인으로, 노트를 인터랙티브 3D 공간에 시각화합니다. OpenAI 임베딩을 UMAP 또는 PCA로 3차원에 투영하여 의미적으로 가까운 노트가 서로 가깝게 배치됩니다. API 키가 없으면 폴더 기반 클러스터 구형 레이아웃과 ConvexHull 클러스터 영역이 표시됩니다.
 
-[English](../README.md) | [日本語](./README_JA.md) | [中文](./README_ZH.md)
+[English](../README.md)
 
 ## 주요 기능
 
@@ -81,7 +81,7 @@ npm run build  # 프로덕션 빌드
 | Drag Sensitivity | 카메라 회전 감도 (0.2–3.0) | `1.0` |
 | Auto Orbit Speed | 유휴 상태 자동 회전 속도 (`0`이면 비활성화) | `0.2` |
 | Exclude Folders | 제외할 폴더 목록(쉼표 구분) | 비어 있음 |
-| Number of Neighbors | UMAP 로컬/전역 균형 (5–50) | `30` |
+| Number of Neighbors | UMAP 로컬/전역 균형 (5–50) | `40` |
 | Minimum Distance | UMAP 군집 거리 (0–0.99) | `0.80` |
 
 ## 임베딩 캐시

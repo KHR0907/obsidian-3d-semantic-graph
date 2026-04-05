@@ -82,7 +82,7 @@ npm run build  # production build
 | Drag Sensitivity | Camera rotation sensitivity (0.2–3.0) | `1.0` |
 | Auto Orbit Speed | Idle camera rotation speed (0 to disable) | `0.2` |
 | Exclude Folders | Comma-separated folders to exclude | Empty |
-| Number of Neighbors | UMAP local/global balance (5–50) | `30` |
+| Number of Neighbors | UMAP local/global balance (5–50) | `40` |
 | Minimum Distance | UMAP clustering tightness (0–0.99) | `0.80` |
 
 ## Embedding Cache

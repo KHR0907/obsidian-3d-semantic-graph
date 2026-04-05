@@ -5,5 +5,6 @@
 	"minAppVersion": "1.5.0",
 	"description": "Visualize your notes in a 3D semantic space using embedding-based layouts or uploaded vectors.",
 	"author": "KHR0907",
+	"authorUrl": "https://github.com/KHR0907",
 	"isDesktopOnly": true
 }

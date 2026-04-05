@@ -32,7 +32,7 @@ export function createDefaultSettings(): PluginSettings {
 		embeddingModel: "text-embedding-3-large",
 		uploadedVectorsFileName: "",
 		projectionMethod: "umap",
-		umapNNeighbors: 30,
+		umapNNeighbors: 40,
 		umapMinDist: 0.8,
 		nodeColorBy: "folder",
 		showLinks: false,
