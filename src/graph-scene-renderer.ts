@@ -149,7 +149,7 @@ export class GraphSceneRenderer {
 		this.currentData = data;
 		this.adjacency = this.buildAdjacency(data);
 
-		const graph = createForceGraph3D()(this.container) as any;
+		const graph = createForceGraph3D()(this.container);
 		this.graph = graph
 			.width(this.container.clientWidth)
 			.height(this.container.clientHeight)
@@ -394,7 +394,7 @@ export class GraphSceneRenderer {
 		if (!this.graph) return;
 
 		this.clearHelperObjects();
-		const scene = (this.graph as any).scene() as THREE.Scene;
+		const scene = this.getGraphScene();
 		const palette = this.getPalette();
 		const axes = new THREE.AxesHelper(this.getAxesLength());
 		const axisMaterials = Array.isArray(axes.material) ? axes.material : [axes.material];
@@ -426,7 +426,7 @@ export class GraphSceneRenderer {
 
 	private syncLinkVisibilityInScene(): void {
 		if (!this.graph) return;
-		const scene = (this.graph as any).scene() as THREE.Scene;
+		const scene = this.getGraphScene();
 		scene.traverse((object) => {
 			const graphObject = object as THREE.Object3D & { __graphObjType?: string };
 			if (graphObject.__graphObjType === "link") {
@@ -619,7 +619,7 @@ export class GraphSceneRenderer {
 		this.nodePathToClusterIdx.clear();
 		if (!this.graph || regions.length === 0) return;
 
-		const scene = (this.graph as any).scene() as THREE.Scene;
+		const scene = this.getGraphScene();
 		const PADDING = 12;
 		const MIN_HULL_POINTS = 4;
 
@@ -719,7 +719,7 @@ export class GraphSceneRenderer {
 		this.hoverMouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
 		this.hoverMouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-		const camera = this.graph.camera() as THREE.Camera;
+		const camera = this.graph.camera();
 		this.hoverRaycaster.setFromCamera(this.hoverMouse, camera);
 
 		const intersects = this.hoverRaycaster.intersectObjects(this.clusterObjects, false);
@@ -746,7 +746,7 @@ export class GraphSceneRenderer {
 			this.clusterObjects = [];
 			return;
 		}
-		const scene = (this.graph as any).scene() as THREE.Scene;
+		const scene = this.getGraphScene();
 		for (const obj of this.clusterObjects) {
 			scene.remove(obj);
 			this.disposeObject(obj);
@@ -762,7 +762,7 @@ export class GraphSceneRenderer {
 			return;
 		}
 
-		const scene = (this.graph as any).scene() as THREE.Scene;
+		const scene = this.getGraphScene();
 		for (const object of this.helperObjects) {
 			scene.remove(object);
 			this.disposeObject(object);
@@ -865,6 +865,10 @@ export class GraphSceneRenderer {
 
 	private getControls(): SceneControls | null {
 		return this.graph ? this.graph.controls() as SceneControls : null;
+	}
+
+	private getGraphScene(): THREE.Scene {
+		return (this.graph as unknown as { scene(): THREE.Scene }).scene();
 	}
 
 	private cloneCameraViewState(cameraState: CameraViewState): CameraViewState {

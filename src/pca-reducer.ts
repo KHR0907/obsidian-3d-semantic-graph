@@ -1,8 +1,8 @@
 export class PcaReducer {
-	async reduce(
+	reduce(
 		embeddings: number[][],
 		onProgress?: (step: number, totalSteps: number) => void
-	): Promise<number[][]> {
+	): number[][] {
 		const sampleCount = embeddings.length;
 		if (sampleCount === 0) return [];
 		if (sampleCount === 1) return [[0, 0, 0]];

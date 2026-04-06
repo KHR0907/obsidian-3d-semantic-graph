@@ -18,10 +18,10 @@ export class UmapReducer {
 	 * Reduce high-dimensional embeddings to 3D coordinates.
 	 * Returns array of [x, y, z] in the same order as input.
 	 */
-	async reduce(
+	reduce(
 		embeddings: number[][],
 		onProgress?: (epoch: number, totalEpochs: number) => void
-	): Promise<number[][]> {
+	): number[][] {
 		const n = embeddings.length;
 
 		// Edge cases: fewer than 3 points
@@ -55,7 +55,7 @@ export class UmapReducer {
 		}
 		onProgress?.(totalEpochs, totalEpochs);
 
-		return umap.getEmbedding() as number[][];
+		return umap.getEmbedding();
 	}
 }
 

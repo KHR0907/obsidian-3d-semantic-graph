@@ -33,7 +33,7 @@ export class GraphInspectorPanel {
 		const actionsEl = this.container.createDiv({ cls: "semantic-graph-inspector-actions" });
 		this.openButton = actionsEl.createEl("button", {
 			cls: "semantic-graph-btn semantic-graph-btn-small",
-			text: "Open Note",
+			text: "Open note",
 		});
 		this.openButton.addEventListener("click", () => {
 			const activeNode = this.getActiveNode();

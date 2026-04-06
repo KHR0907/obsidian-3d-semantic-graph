@@ -27,15 +27,15 @@ export default class SemanticGraphPlugin extends Plugin {
 			);
 		});
 
-		this.addRibbonIcon("network", "3D Semantic Graph", () => {
-			this.activateView();
+		this.addRibbonIcon("network", "3D semantic graph", () => {
+			void this.activateView();
 		});
 
 		this.addCommand({
 			id: "open-semantic-graph",
-			name: "Open 3D Semantic Graph",
+			name: "Open graph view",
 			callback: () => {
-				this.activateView();
+				void this.activateView();
 			},
 		});
 
@@ -87,7 +87,7 @@ export default class SemanticGraphPlugin extends Plugin {
 	async activateView() {
 		const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE);
 		if (existing.length > 0) {
-			this.app.workspace.revealLeaf(existing[0]);
+			await this.app.workspace.revealLeaf(existing[0]);
 			return;
 		}
 
@@ -96,6 +96,6 @@ export default class SemanticGraphPlugin extends Plugin {
 			type: VIEW_TYPE,
 			active: true,
 		});
-		this.app.workspace.revealLeaf(leaf);
+		await this.app.workspace.revealLeaf(leaf);
 	}
 }

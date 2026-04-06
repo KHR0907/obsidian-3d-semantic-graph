@@ -1,4 +1,4 @@
-import { ItemView, Notice, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
+import { ItemView, Notice, TFile, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
 import { canGenerateEmbeddings, clonePluginSettings, GraphNode, GraphVisualOptions, PluginSettings } from "./types";
 import { createSeededRandom } from "./seeded-rng";
 import { buildGraphData } from "./graph-data";
@@ -11,9 +11,9 @@ const LAYOUT_RADIUS_RATIO = 0.45;
 const MIN_NODE_DISTANCE = 14;
 const TOOLTIP_DELAY_MS = 150;
 const CLUSTERS_MODE_TOOLTIPS = {
-	on: "Clusters On",
-	off: "Clusters Off",
-	hover: "Clusters Hover",
+	on: "Clusters on",
+	off: "Clusters off",
+	hover: "Clusters hover",
 } as const;
 type ClustersMode = PluginSettings["showClusters"];
 
@@ -48,7 +48,7 @@ export class SemanticGraphView extends ItemView {
 	}
 
 	getViewType(): string { return VIEW_TYPE; }
-	getDisplayText(): string { return "3D Semantic Graph"; }
+	getDisplayText(): string { return "3D semantic graph"; }
 	getIcon(): string { return "network"; }
 
 	async onOpen(): Promise<void> {
@@ -66,7 +66,7 @@ export class SemanticGraphView extends ItemView {
 		});
 		setIcon(refreshBtn, "refresh-ccw");
 		this.setToolbarTooltip(refreshBtn, "Refresh");
-		refreshBtn.addEventListener("click", () => this.loadGraph());
+		refreshBtn.addEventListener("click", () => void this.loadGraph());
 
 		const resetViewBtn = this.toolbar.createEl("button", {
 			cls: "semantic-graph-btn semantic-graph-icon-btn semantic-graph-icon-pair-btn",
@@ -79,7 +79,7 @@ export class SemanticGraphView extends ItemView {
 		const resetRotateIcon = resetViewBtn.createSpan({ cls: "semantic-graph-icon-slot" });
 		setIcon(resetCameraIcon, "camera");
 		setIcon(resetRotateIcon, "rotate-ccw");
-		this.setToolbarTooltip(resetViewBtn, "Reset Camera View");
+		this.setToolbarTooltip(resetViewBtn, "Reset camera view");
 		resetViewBtn.addEventListener("click", () => this.renderer?.resetView());
 
 		this.linksToggleBtn = this.toolbar.createEl("button", { cls: "semantic-graph-btn" });
@@ -113,7 +113,7 @@ export class SemanticGraphView extends ItemView {
 		await this.loadGraph();
 	}
 
-	async onClose(): Promise<void> {
+	onClose(): void {
 		this.resizeObserver?.disconnect();
 		this.renderer?.dispose();
 		this.renderer = null;
@@ -146,7 +146,7 @@ export class SemanticGraphView extends ItemView {
 
 		this.linksToggleBtn.empty();
 		setIcon(this.linksToggleBtn, "map");
-		this.setToolbarTooltip(this.linksToggleBtn, this.settings.showLinks ? "Links On" : "Links Off");
+		this.setToolbarTooltip(this.linksToggleBtn, this.settings.showLinks ? "Links on" : "Links off");
 		this.linksToggleBtn.classList.toggle("is-active", this.settings.showLinks);
 	}
 
@@ -155,7 +155,7 @@ export class SemanticGraphView extends ItemView {
 
 		this.gridToggleBtn.empty();
 		setIcon(this.gridToggleBtn, "layout-grid");
-		this.setToolbarTooltip(this.gridToggleBtn, this.settings.showGrid ? "Grid On" : "Grid Off");
+		this.setToolbarTooltip(this.gridToggleBtn, this.settings.showGrid ? "Grid on" : "Grid off");
 		this.gridToggleBtn.classList.toggle("is-active", this.settings.showGrid);
 	}
 
@@ -221,7 +221,7 @@ export class SemanticGraphView extends ItemView {
 
 	private openNote(path: string): void {
 		const file = this.app.vault.getAbstractFileByPath(path);
-		if (file) this.app.workspace.getLeaf(false).openFile(file as any);
+		if (file instanceof TFile) void this.app.workspace.getLeaf(false).openFile(file);
 	}
 
 	private syncSettingsFromSource(): void {
@@ -308,9 +308,9 @@ export class SemanticGraphView extends ItemView {
 						);
 						finalPositions = clusterResult.positions;
 					}
-				} catch (embErr: any) {
+				} catch (embErr: unknown) {
 					if (!isCurrentRequest()) return;
-					console.warn("Embedding step failed:", embErr?.message);
+					console.warn("Embedding step failed:", embErr instanceof Error ? embErr.message : String(embErr));
 					this.setStatus("Embedding failed, using clustered sphere layout...");
 					clusterResult = createClusteredSphereLayout(
 						graphData.nodes, layoutRadius, settings.layoutSeed
@@ -360,12 +360,12 @@ export class SemanticGraphView extends ItemView {
 				: buildClusterRegions(graphData.nodes);
 			this.renderer.setClusterRegions(regions);
 			this.renderer.setClustersMode(this.getClustersMode(settings));
-		} catch (err: any) {
+		} catch (err: unknown) {
 			if (!isCurrentRequest()) return;
 			console.error("Semantic Graph error:", err);
-			const msg = err?.message || String(err);
+			const msg = err instanceof Error ? err.message : String(err);
 			this.showError(`Error: ${msg}`);
-			new Notice(`3D Semantic Graph: ${msg}`);
+			new Notice(`3D semantic graph: ${msg}`);
 		}
 	}
 

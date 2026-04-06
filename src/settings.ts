@@ -23,12 +23,12 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "3D Semantic Graph Settings" });
+		new Setting(containerEl).setName("3D semantic graph settings").setHeading();
 
 		// --- API Settings ---
-		containerEl.createEl("h3", { text: "Embedding API" });
+		new Setting(containerEl).setName("Embedding API").setHeading();
 		new Setting(containerEl)
-			.setName("API Key")
+			.setName("API key")
 			.setDesc("API key for generating embeddings. Leave empty to use sphere layout without semantic positioning.")
 			.addText((text) =>
 				text
@@ -41,7 +41,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Embedding Model")
+			.setName("Embedding model")
 			.setDesc("Choose an OpenAI embedding model.")
 			.addDropdown((dropdown) =>
 				this.addEmbeddingModelOptions(dropdown)
@@ -55,7 +55,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Custom Vector JSON")
+			.setName("Custom vector JSON")
 			.setDesc("Use uploaded vectors instead of API embeddings.")
 			.addButton((button) =>
 				button
@@ -65,7 +65,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			)
 			.addButton((button) =>
 				button
-					.setButtonText(this.plugin.settings.uploadedVectorsFileName ? "Upload Again" : "Upload")
+					.setButtonText(this.plugin.settings.uploadedVectorsFileName ? "Upload again" : "Upload")
 					.onClick(() => void this.uploadVectorsJson())
 			)
 			.addText((text) =>
@@ -85,15 +85,15 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		// --- Graph Settings ---
-		containerEl.createEl("h3", { text: "Graph" });
+		new Setting(containerEl).setName("Graph").setHeading();
 
 		new Setting(containerEl)
-			.setName("Node Color By")
-			.setDesc("How to assign colors to nodes. Default: Folder.")
+			.setName("Node color by")
+			.setDesc("How to assign colors to nodes. Default: folder.")
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOption("folder", "Folder")
-					.addOption("tag", "First Tag")
+					.addOption("tag", "First tag")
 					.setValue(this.plugin.settings.nodeColorBy)
 					.onChange(async (value: "folder" | "tag") => {
 						await this.patchSettings({ nodeColorBy: value });
@@ -101,7 +101,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Projection Method")
+			.setName("Projection method")
 			.setDesc("Choose the algorithm used to project embeddings into 3D. Default: UMAP.")
 			.addDropdown((dropdown) =>
 				dropdown
@@ -114,7 +114,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Layout Seed")
+			.setName("Layout seed")
 			.setDesc("Seed used for stochastic layout steps like UMAP and overlap resolution. Same seed gives the same layout more reliably. Default: random.")
 			.addButton((button) =>
 				button
@@ -139,8 +139,8 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Show Links")
-			.setDesc("Display connection lines between nodes. Default: Off.")
+			.setName("Show links")
+			.setDesc("Display connection lines between nodes. Default: off.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.showLinks)
@@ -150,8 +150,8 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Show Grid")
-			.setDesc("Display a solid square grid on the XZ coordinate plane. Default: On.")
+			.setName("Show grid")
+			.setDesc("Display a solid square grid on the XZ coordinate plane. Default: on.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.showGrid)
@@ -160,11 +160,11 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					})
 			);
 
-		containerEl.createEl("h3", { text: "Appearance" });
+		new Setting(containerEl).setName("Appearance").setHeading();
 
 		new Setting(containerEl)
-			.setName("Scene Theme")
-			.setDesc("Choose the background style for the 3D stage. Default: Light.")
+			.setName("Scene theme")
+			.setDesc("Choose the background style for the 3D stage. Default: light.")
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOption("dark", "Dark")
@@ -176,7 +176,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Node Opacity")
+			.setName("Node opacity")
 			.setDesc("Adjust node transparency. Default: 1.0.")
 			.addSlider((slider) =>
 				slider
@@ -189,7 +189,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Node Size")
+			.setName("Node size")
 			.setDesc("Adjust the size of 3D nodes. Default: 1.5.")
 			.addSlider((slider) =>
 				slider
@@ -202,7 +202,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Drag Sensitivity")
+			.setName("Drag sensitivity")
 			.setDesc("Adjust how strongly the camera responds when dragging the graph. Default: 1.0.")
 			.addSlider((slider) =>
 				slider
@@ -215,7 +215,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Auto Orbit Speed")
+			.setName("Auto orbit speed")
 			.setDesc("Adjust the idle camera orbit speed. Set to 0 to disable automatic camera movement. Default: 0.2.")
 			.addSlider((slider) =>
 				slider
@@ -228,7 +228,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Exclude Folders")
+			.setName("Exclude folders")
 			.setDesc("Comma-separated list of folders to exclude from the graph.")
 			.addText((text) =>
 				text
@@ -245,10 +245,10 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		// --- UMAP Settings ---
-		containerEl.createEl("h3", { text: "UMAP Parameters" });
+		new Setting(containerEl).setName("UMAP parameters").setHeading();
 
 		new Setting(containerEl)
-			.setName("Number of Neighbors")
+			.setName("Number of neighbors")
 			.setDesc("Controls local vs global structure (5-50). Lower = tighter clusters, higher = broader spread. Default: 30.")
 			.addSlider((slider) =>
 				slider
@@ -261,7 +261,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Minimum Distance")
+			.setName("Minimum distance")
 			.setDesc("How tightly UMAP packs similar points (0.0-0.99). Lower = more clustered. Default: 0.80.")
 			.addSlider((slider) =>
 				slider
@@ -274,10 +274,10 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		// --- Reset ---
-		containerEl.createEl("h3", { text: "Reset" });
+		new Setting(containerEl).setName("Reset").setHeading();
 
 		new Setting(containerEl)
-			.setName("Reset to Defaults")
+			.setName("Reset to defaults")
 			.setDesc("Restore all settings to their default values (API key is preserved).")
 			.addButton((btn) =>
 				btn
@@ -320,7 +320,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			: PRESET_EMBEDDING_MODELS.openai[0];
 	}
 
-	private async uploadVectorsJson(): Promise<void> {
+	private uploadVectorsJson(): void {
 		const input = document.createElement("input");
 		input.type = "file";
 		input.accept = "application/json,.json";
