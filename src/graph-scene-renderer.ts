@@ -160,7 +160,7 @@ export class GraphSceneRenderer {
 			.nodeThreeObjectExtend(false)
 			.linkWidth(0.5)
 			.linkVisibility(() => this.linksVisible)
-			.linkOpacity((link: object) => this.getLinkOpacity(link as GraphLink))
+			.linkOpacity(1)
 			.linkColor((link: object) => this.getLinkColor(link as GraphLink))
 			.enableNodeDrag(false)
 			.cooldownTicks(0)
@@ -809,8 +809,12 @@ export class GraphSceneRenderer {
 
 	private getLinkColor(link: GraphLink): string {
 		const palette = this.getPalette();
-		if (!this.selectedNodePath) return palette.baseLinkColor;
-		return this.isHighlightedLink(link) ? palette.highlightLinkColor : palette.dimLinkColor;
+		if (!this.selectedNodePath) {
+			return this.withAlpha(palette.baseLinkColor, BASE_LINK_OPACITY);
+		}
+		return this.isHighlightedLink(link)
+			? this.withAlpha(palette.highlightLinkColor, HIGHLIGHT_LINK_OPACITY)
+			: this.withAlpha(palette.dimLinkColor, DIMMED_LINK_OPACITY);
 	}
 
 	private getLinkOpacity(link: GraphLink): number {
@@ -923,6 +927,11 @@ export class GraphSceneRenderer {
 		return `#${[mix(r1, r2), mix(g1, g2), mix(b1, b2)]
 			.map((value) => value.toString(16).padStart(2, "0"))
 			.join("")}`;
+	}
+
+	private withAlpha(color: string, opacity: number): string {
+		const [r, g, b] = this.hexToRgb(color);
+		return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 	}
 
 	private hexToRgb(color: string): [number, number, number] {

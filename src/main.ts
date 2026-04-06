@@ -27,7 +27,7 @@ export default class SemanticGraphPlugin extends Plugin {
 			);
 		});
 
-		this.addRibbonIcon("network", "3D semantic graph", () => {
+		this.addRibbonIcon("network", "Semantic graph", () => {
 			void this.activateView();
 		});
 

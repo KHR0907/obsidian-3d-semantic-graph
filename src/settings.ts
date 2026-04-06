@@ -4,7 +4,6 @@ import { EmbeddingService } from "./embedding";
 import {
 	clonePluginSettings,
 	createDefaultSettings,
-	EMBEDDING_PROVIDER_LABELS,
 	generateRandomLayoutSeed,
 	PluginSettings,
 	PRESET_EMBEDDING_MODELS,
@@ -23,16 +22,14 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		new Setting(containerEl).setName("3D semantic graph settings").setHeading();
-
-		// --- API Settings ---
-		new Setting(containerEl).setName("Embedding API").setHeading();
+		// --- Embeddings ---
+		new Setting(containerEl).setName("Embeddings").setHeading();
 		new Setting(containerEl)
-			.setName("API key")
-			.setDesc("API key for generating embeddings. Leave empty to use sphere layout without semantic positioning.")
+			.setName("Access key")
+			.setDesc("Access key for generating embeddings. Leave blank to use the sphere layout without semantic positioning.")
 			.addText((text) =>
 				text
-					.setPlaceholder("sk-...")
+					.setPlaceholder("Paste your access key")
 					.setValue(this.plugin.settings.embeddingApiKey)
 					.then((t) => (t.inputEl.type = "password"))
 					.onChange(async (value) => {
@@ -42,7 +39,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Embedding model")
-			.setDesc("Choose an OpenAI embedding model.")
+			.setDesc("Choose which model to use for embeddings.")
 			.addDropdown((dropdown) =>
 				this.addEmbeddingModelOptions(dropdown)
 					.setValue(this.getSelectedEmbeddingOptionValue())
@@ -55,12 +52,12 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Custom vector JSON")
-			.setDesc("Use uploaded vectors instead of API embeddings.")
+			.setName("Vector file")
+			.setDesc("Use an uploaded vector file instead of generated embeddings.")
 			.addButton((button) =>
 				button
 					.setButtonText("Export")
-					.setTooltip("Download vectors in the uploaded-vectors JSON format")
+					.setTooltip("Download vectors as a compatible file")
 					.onClick(() => void this.exportVectorsJson())
 			)
 			.addButton((button) =>
@@ -70,7 +67,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			)
 			.addText((text) =>
 				text
-					.setPlaceholder("upload_file_name.json")
+					.setPlaceholder("Uploaded file name")
 					.setValue(this.plugin.settings.uploadedVectorsFileName)
 					.setDisabled(true)
 			)
@@ -102,11 +99,11 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Projection method")
-			.setDesc("Choose the algorithm used to project embeddings into 3D. Default: UMAP.")
+			.setDesc("Choose how embeddings are projected into space. Default: mapped layout.")
 			.addDropdown((dropdown) =>
 				dropdown
-					.addOption("umap", "UMAP")
-					.addOption("pca", "PCA")
+					.addOption("umap", "Mapped layout")
+					.addOption("pca", "Principal components")
 					.setValue(this.plugin.settings.projectionMethod)
 					.onChange(async (value: "umap" | "pca") => {
 						await this.patchSettings({ projectionMethod: value });
@@ -115,7 +112,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Layout seed")
-			.setDesc("Seed used for stochastic layout steps like UMAP and overlap resolution. Same seed gives the same layout more reliably. Default: random.")
+			.setDesc("Seed used for layout steps and overlap resolution. Using the same seed makes the layout more repeatable. Default: random.")
 			.addButton((button) =>
 				button
 					.setButtonText("Random")
@@ -151,7 +148,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Show grid")
-			.setDesc("Display a solid square grid on the XZ coordinate plane. Default: on.")
+			.setDesc("Display a solid square grid on the ground plane. Default: on.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.showGrid)
@@ -164,7 +161,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Scene theme")
-			.setDesc("Choose the background style for the 3D stage. Default: light.")
+			.setDesc("Choose the background style for the scene. Default: light.")
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOption("dark", "Dark")
@@ -190,7 +187,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Node size")
-			.setDesc("Adjust the size of 3D nodes. Default: 1.5.")
+			.setDesc("Adjust the size of nodes. Default: 1.5.")
 			.addSlider((slider) =>
 				slider
 					.setLimits(0.4, 2, 0.05)
@@ -232,7 +229,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			.setDesc("Comma-separated list of folders to exclude from the graph.")
 			.addText((text) =>
 				text
-					.setPlaceholder("templates, daily-notes")
+					.setPlaceholder("Templates, daily-notes")
 					.setValue(this.plugin.settings.excludeFolders.join(", "))
 					.onChange(async (value) => {
 						await this.patchSettings({
@@ -244,8 +241,8 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					})
 			);
 
-		// --- UMAP Settings ---
-		new Setting(containerEl).setName("UMAP parameters").setHeading();
+		// --- Projection tuning ---
+		new Setting(containerEl).setName("Projection tuning").setHeading();
 
 		new Setting(containerEl)
 			.setName("Number of neighbors")
@@ -262,7 +259,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Minimum distance")
-			.setDesc("How tightly UMAP packs similar points (0.0-0.99). Lower = more clustered. Default: 0.80.")
+			.setDesc("How tightly similar points are packed (0.0-0.99). Lower values create tighter clusters. Default: 0.80.")
 			.addSlider((slider) =>
 				slider
 					.setLimits(0, 0.99, 0.01)
@@ -278,7 +275,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Reset to defaults")
-			.setDesc("Restore all settings to their default values (API key is preserved).")
+			.setDesc("Restore all settings to their default values. The access key is preserved.")
 			.addButton((btn) =>
 				btn
 					.setButtonText("Reset")
@@ -309,7 +306,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 	private addEmbeddingModelOptions(dropdown: import("obsidian").DropdownComponent) {
 		PRESET_EMBEDDING_MODELS.openai.forEach((model) => {
-			dropdown.addOption(model, `${EMBEDDING_PROVIDER_LABELS.openai} - ${model}`);
+			dropdown.addOption(model, model);
 		});
 		return dropdown;
 	}
@@ -334,9 +331,9 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 				await this.app.vault.adapter.write(path, raw);
 				await this.patchSettings({ uploadedVectorsFileName: file.name });
 				this.display();
-				new Notice("Uploaded vectors JSON saved.");
+				new Notice("Uploaded vector file saved.");
 			} catch (error) {
-				new Notice(`Failed to upload vectors JSON: ${error instanceof Error ? error.message : String(error)}`);
+				new Notice(`Failed to upload vector file: ${error instanceof Error ? error.message : String(error)}`);
 			}
 		};
 		input.click();
@@ -353,19 +350,19 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			if (await adapter.exists(uploadedPath)) {
 				raw = await adapter.read(uploadedPath);
 				fileName = this.plugin.settings.uploadedVectorsFileName || UPLOADED_VECTORS_FILE;
-				noticeMessage = "Existing uploaded vectors exported.";
+				noticeMessage = "Uploaded vector file exported.";
 			} else {
 				if (this.plugin.settings.embeddingApiKey.trim()) {
-					new Notice("Generating vectors JSON...");
+					new Notice("Generating vector file...");
 					const service = new EmbeddingService(this.app, this.plugin.settings, this.plugin.manifest.dir!);
 					const embeddings = await service.getEmbeddings();
 					raw = serializeUploadedVectors(embeddings.entries());
 					fileName = "exported-vectors.json";
-					noticeMessage = "Generated vectors exported.";
+					noticeMessage = "Generated vector file exported.";
 				} else {
 					raw = this.getUploadedVectorsTemplateJson();
 					fileName = "vectors-template.json";
-					noticeMessage = "Template vectors JSON exported.";
+					noticeMessage = "Template vector file exported.";
 				}
 			}
 
@@ -373,7 +370,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			const vaultPath = await this.writeVectorsPreviewFile(fileName, raw);
 			new Notice(`${noticeMessage} Created ${vaultPath} in the vault.`);
 		} catch (error) {
-			new Notice(`Failed to extract vectors JSON: ${error instanceof Error ? error.message : String(error)}`);
+			new Notice(`Failed to export vector file: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
 

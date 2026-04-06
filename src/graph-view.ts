@@ -48,7 +48,7 @@ export class SemanticGraphView extends ItemView {
 	}
 
 	getViewType(): string { return VIEW_TYPE; }
-	getDisplayText(): string { return "3D semantic graph"; }
+	getDisplayText(): string { return "Semantic graph"; }
 	getIcon(): string { return "network"; }
 
 	async onOpen(): Promise<void> {
@@ -113,10 +113,11 @@ export class SemanticGraphView extends ItemView {
 		await this.loadGraph();
 	}
 
-	onClose(): void {
+	onClose(): Promise<void> {
 		this.resizeObserver?.disconnect();
 		this.renderer?.dispose();
 		this.renderer = null;
+		return Promise.resolve();
 	}
 
 	updateSettings(settings: PluginSettings): void {
@@ -365,7 +366,7 @@ export class SemanticGraphView extends ItemView {
 			console.error("Semantic Graph error:", err);
 			const msg = err instanceof Error ? err.message : String(err);
 			this.showError(`Error: ${msg}`);
-			new Notice(`3D semantic graph: ${msg}`);
+			new Notice(`Semantic graph: ${msg}`);
 		}
 	}
 
