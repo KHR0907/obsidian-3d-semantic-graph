@@ -1,5 +1,5 @@
 import { App, TFile } from "obsidian";
-import { GraphData, GraphNode, GraphLink, PluginSettings } from "./types";
+import { GraphData, GraphNode, GraphLink, isPathExcluded, PluginSettings } from "./types";
 
 const FOLDER_COLORS = [
 	"#6366f1", "#ec4899", "#14b8a6", "#f59e0b", "#8b5cf6",
@@ -12,9 +12,7 @@ export function buildGraphData(app: App, settings: PluginSettings): GraphData {
 	let colorIndex = 0;
 
 	const files = app.vault.getMarkdownFiles().filter((file) => {
-		return !settings.excludeFolders.some(
-			(folder) => file.path.startsWith(folder + "/") || file.path === folder
-		);
+		return !isPathExcluded(file.path, settings.excludeFolders);
 	});
 
 	const nodeSet = new Set<string>();

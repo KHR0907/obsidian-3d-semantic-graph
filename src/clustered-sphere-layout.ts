@@ -41,9 +41,7 @@ export function createClusteredSphereLayout(
 	// --- Group by folder ---
 	const folderGroups = new Map<string, GraphNode[]>();
 	for (const node of nodes) {
-		const folder = node.path.includes("/")
-			? node.path.substring(0, node.path.lastIndexOf("/"))
-			: "/";
+		const folder = getFolderPath(node.path);
 		if (!folderGroups.has(folder)) folderGroups.set(folder, []);
 		folderGroups.get(folder)!.push(node);
 	}
@@ -140,9 +138,7 @@ export function createClusteredSphereLayout(
 export function buildClusterRegions(nodes: GraphNode[]): ClusterRegion[] {
 	const folderGroups = new Map<string, GraphNode[]>();
 	for (const node of nodes) {
-		const folder = node.path.includes("/")
-			? node.path.substring(0, node.path.lastIndexOf("/"))
-			: "/";
+		const folder = getFolderPath(node.path);
 		if (!folderGroups.has(folder)) folderGroups.set(folder, []);
 		folderGroups.get(folder)!.push(node);
 	}
@@ -182,4 +178,8 @@ function cross(a: [number, number, number], b: [number, number, number]): [numbe
 function vecDist(a: [number, number, number], b: [number, number, number]): number {
 	const dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
 	return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+function getFolderPath(path: string): string {
+	return path.includes("/") ? path.substring(0, path.lastIndexOf("/")) : "/";
 }

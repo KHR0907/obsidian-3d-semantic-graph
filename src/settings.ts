@@ -5,6 +5,7 @@ import {
 	clonePluginSettings,
 	createDefaultSettings,
 	generateRandomLayoutSeed,
+	isPathExcluded,
 	PluginSettings,
 	PRESET_EMBEDDING_MODELS,
 } from "./types";
@@ -378,9 +379,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 		const entries = this.app.vault
 			.getMarkdownFiles()
 			.filter((file) => {
-				return !this.plugin.settings.excludeFolders.some(
-					(folder) => file.path.startsWith(`${folder}/`) || file.path === folder
-				);
+				return !isPathExcluded(file.path, this.plugin.settings.excludeFolders);
 			})
 			.map((file) => [file.path, { embedding: [] as number[] }] as const);
 		return JSON.stringify({ entries: Object.fromEntries(entries) }, null, 2);

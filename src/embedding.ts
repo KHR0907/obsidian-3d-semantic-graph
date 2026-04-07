@@ -4,6 +4,7 @@ import {
 	EmbeddingCache,
 	EmbeddingCacheEntry,
 	getEmbeddingCacheModelId,
+	isPathExcluded,
 	PluginSettings,
 } from "./types";
 
@@ -62,7 +63,7 @@ export class EmbeddingService {
 			}
 		}
 
-		const toEmbed: { file: TFile; text: string }[] = [];
+		const toEmbed: { file: TFile; text: string; contentHash: string }[] = [];
 		for (const file of files) {
 			const content = await this.app.vault.cachedRead(file);
 			const hash = this.hashContent(content);
@@ -74,7 +75,7 @@ export class EmbeddingService {
 
 			const cleaned = this.extractText(content);
 			if (cleaned.length > 0) {
-				toEmbed.push({ file, text: cleaned });
+				toEmbed.push({ file, text: cleaned, contentHash: hash });
 			}
 		}
 
@@ -93,10 +94,9 @@ export class EmbeddingService {
 			const embeddings = await adapter.embed(batch.map((item) => item.text));
 
 			for (let j = 0; j < batch.length; j++) {
-				const { file } = batch[j];
-				const content = await this.app.vault.cachedRead(file);
+				const { file, contentHash } = batch[j];
 				const entry: EmbeddingCacheEntry = {
-					contentHash: this.hashContent(content),
+					contentHash,
 					embedding: embeddings[j],
 					lastModified: file.stat.mtime,
 				};
@@ -114,9 +114,7 @@ export class EmbeddingService {
 
 	private getEligibleFiles(): TFile[] {
 		return this.app.vault.getMarkdownFiles().filter((file) => {
-			return !this.settings.excludeFolders.some(
-				(folder) => file.path.startsWith(`${folder}/`) || file.path === folder
-			);
+			return !isPathExcluded(file.path, this.settings.excludeFolders);
 		});
 	}
 

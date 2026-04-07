@@ -1,4 +1,4 @@
-import { GraphData, GraphNode } from "./types";
+import { getNodePath, GraphData, GraphNode } from "./types";
 
 export class GraphInspectorPanel {
 	private container: HTMLElement;
@@ -65,8 +65,8 @@ export class GraphInspectorPanel {
 		}
 
 		for (const link of data.links) {
-			const source = this.getNodePath(link.source);
-			const target = this.getNodePath(link.target);
+			const source = getNodePath(link.source);
+			const target = getNodePath(link.target);
 			if (!source || !target) continue;
 
 			this.adjacency.get(source)?.add(target);
@@ -84,11 +84,13 @@ export class GraphInspectorPanel {
 	}
 
 	setHoveredNode(node: GraphNode | null): void {
+		if (this.hoveredNode === node) return;
 		this.hoveredNode = node;
 		this.render();
 	}
 
 	setSelectedNode(node: GraphNode | null): void {
+		if (this.selectedNode === node) return;
 		this.selectedNode = node;
 		this.render();
 	}
@@ -152,10 +154,5 @@ export class GraphInspectorPanel {
 
 	private getActiveNode(): GraphNode | null {
 		return this.selectedNode ?? this.hoveredNode;
-	}
-
-	private getNodePath(nodeRef: string | GraphNode): string | null {
-		if (typeof nodeRef === "string") return nodeRef;
-		return nodeRef?.path ?? nodeRef?.id ?? null;
 	}
 }

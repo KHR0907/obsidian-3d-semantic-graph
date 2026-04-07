@@ -55,8 +55,6 @@ export function clonePluginSettings(settings: PluginSettings): PluginSettings {
 	};
 }
 
-export const DEFAULT_SETTINGS: PluginSettings = createDefaultSettings();
-
 export const EMBEDDING_PROVIDER_LABELS: Record<EmbeddingProvider, string> = {
 	openai: "OpenAI",
 };
@@ -90,6 +88,17 @@ export function canGenerateEmbeddings(settings: PluginSettings): boolean {
 		return true;
 	}
 	return Boolean(settings.embeddingApiKey.trim());
+}
+
+export function getNodePath(nodeRef: string | GraphNode): string | null {
+	if (typeof nodeRef === "string") return nodeRef;
+	return nodeRef?.path ?? nodeRef?.id ?? null;
+}
+
+export function isPathExcluded(path: string, excludeFolders: string[]): boolean {
+	return excludeFolders.some(
+		(folder) => path.startsWith(`${folder}/`) || path === folder
+	);
 }
 
 export interface GraphVisualOptions {

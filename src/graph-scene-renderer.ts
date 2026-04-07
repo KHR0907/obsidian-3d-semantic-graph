@@ -1,7 +1,7 @@
 import ForceGraph3D, { type ForceGraph3DInstance } from "3d-force-graph";
 import * as THREE from "three";
 import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
-import { GraphData, GraphLink, GraphNode, GraphVisualOptions } from "./types";
+import { getNodePath, GraphData, GraphLink, GraphNode, GraphVisualOptions } from "./types";
 import { ClusterRegion } from "./clustered-sphere-layout";
 
 const BASE_LINK_OPACITY = 0.2;
@@ -311,8 +311,8 @@ export class GraphSceneRenderer {
 		}
 
 		for (const link of data.links) {
-			const source = this.getNodePath(link.source);
-			const target = this.getNodePath(link.target);
+			const source = getNodePath(link.source);
+			const target = getNodePath(link.target);
 			if (!source || !target) continue;
 
 			adjacency.get(source)?.add(target);
@@ -817,16 +817,11 @@ export class GraphSceneRenderer {
 			: this.withAlpha(palette.dimLinkColor, DIMMED_LINK_OPACITY);
 	}
 
-	private getLinkOpacity(link: GraphLink): number {
-		if (!this.selectedNodePath) return BASE_LINK_OPACITY;
-		return this.isHighlightedLink(link) ? HIGHLIGHT_LINK_OPACITY : DIMMED_LINK_OPACITY;
-	}
-
 	private isHighlightedLink(link: GraphLink): boolean {
 		if (!this.selectedNodePath) return false;
 
-		const source = this.getNodePath(link.source);
-		const target = this.getNodePath(link.target);
+		const source = getNodePath(link.source);
+		const target = getNodePath(link.target);
 		if (!source || !target) return false;
 
 		return source === this.selectedNodePath || target === this.selectedNodePath;
@@ -909,11 +904,6 @@ export class GraphSceneRenderer {
 		return progress < 0.5
 			? 4 * progress * progress * progress
 			: 1 - Math.pow(-2 * progress + 2, 3) / 2;
-	}
-
-	private getNodePath(nodeRef: string | GraphNode): string | null {
-		if (typeof nodeRef === "string") return nodeRef;
-		return nodeRef?.path ?? nodeRef?.id ?? null;
 	}
 
 	private getPalette(): SceneThemePalette {
