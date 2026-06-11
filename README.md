@@ -30,7 +30,7 @@ Desktop-only Obsidian plugin that visualizes your notes in an interactive 3D spa
 
 ```bash
 git clone <repository-url>
-cd obsidian-3d-semantic-graph
+cd 3d-semantic-graph
 npm install
 npm run build
 ```
@@ -38,7 +38,7 @@ npm run build
 Copy `main.js`, `manifest.json`, and `styles.css` into:
 
 ```
-<your-vault>/.obsidian/plugins/3d-semantic-graph/
+<your-vault>/.obsidian/plugins/semantic-graph/
 ```
 
 Then restart Obsidian and enable **3D Semantic Graph** in **Settings → Community plugins**.
