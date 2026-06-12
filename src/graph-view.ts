@@ -141,6 +141,16 @@ export class SemanticGraphView extends ItemView {
 		setIcon(this.timelineBtn, "history");
 		this.setToolbarTooltip(this.timelineBtn, "Timeline");
 		this.timelineBtn.addEventListener("click", () => this.toggleTimeline());
+		const exportBtn = this.toolbar.createEl("button", {
+			cls: "semantic-graph-btn semantic-graph-icon-btn",
+			attr: {
+				type: "button",
+				"aria-label": "Export interactive HTML",
+			},
+		});
+		setIcon(exportBtn, "download");
+		this.setToolbarTooltip(exportBtn, "Export HTML");
+		exportBtn.addEventListener("click", () => void this.exportGraphHtml());
 		this.updateLinksToggleButton();
 		this.updateGridToggleButton();
 		this.updateClustersToggleButton();
@@ -321,6 +331,32 @@ export class SemanticGraphView extends ItemView {
 	private openNote(path: string): void {
 		const file = this.app.vault.getAbstractFileByPath(path);
 		if (file instanceof TFile) void this.app.workspace.getLeaf(false).openFile(file);
+	}
+
+	private async exportGraphHtml(): Promise<void> {
+		if (!this.lastGraphData || this.lastGraphData.nodes.length === 0) {
+			new Notice("Load the graph before exporting.");
+			return;
+		}
+
+		try {
+			const { buildGraphExportHtml } = await import("./html-export");
+			const html = buildGraphExportHtml(this.lastGraphData, {
+				vaultName: this.app.vault.getName(),
+				sceneTheme: this.resolveSceneTheme(),
+			});
+
+			const blob = new Blob([html], { type: "text/html" });
+			const url = URL.createObjectURL(blob);
+			const anchor = document.createElement("a");
+			anchor.href = url;
+			anchor.download = "semantic-graph.html";
+			anchor.click();
+			URL.revokeObjectURL(url);
+			new Notice("Graph exported as semantic-graph.html");
+		} catch (error) {
+			new Notice(`Failed to export graph: ${error instanceof Error ? error.message : String(error)}`);
+		}
 	}
 
 	private toggleTimeline(): void {
