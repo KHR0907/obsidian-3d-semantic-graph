@@ -4,9 +4,8 @@ import {
 	DuplicatePair,
 	MAX_PAIRWISE_NODES,
 	SuggestedLink,
-	computeDuplicates,
 	computeOrphans,
-	computeSuggestedLinks,
+	computePairInsights,
 } from "./insights";
 import { GraphData } from "./types";
 
@@ -37,6 +36,8 @@ export class InsightsPanel {
 	private data: InsightsPanelData | null = null;
 	private computed: ComputedInsights | null = null;
 	private open = false;
+	private computeRequestId = 0;
+	private computingStatusEl: HTMLElement | null = null;
 
 	constructor(app: App, parentEl: HTMLElement, callbacks: InsightsPanelCallbacks) {
 		this.app = app;
@@ -103,17 +104,53 @@ export class InsightsPanel {
 			return;
 		}
 
-		if (!this.computed) {
-			const { graphData, embeddings, maxSuggestions } = this.data;
-			this.computed = {
-				suggestions: embeddings ? computeSuggestedLinks(embeddings, graphData.links, maxSuggestions) : [],
-				duplicates: embeddings ? computeDuplicates(embeddings) : [],
-				orphans: computeOrphans(graphData.nodes, graphData.links),
-			};
-			this.callbacks.onSuggestions(this.computed.suggestions);
+		if (this.computed) {
+			this.render();
+			return;
+		}
+		void this.runComputation();
+	}
+
+	private async runComputation(): Promise<void> {
+		if (!this.data) return;
+		const requestId = ++this.computeRequestId;
+		const { graphData, embeddings, maxSuggestions } = this.data;
+
+		const orphans = computeOrphans(graphData.nodes, graphData.links);
+		let suggestions: SuggestedLink[] = [];
+		let duplicates: DuplicatePair[] = [];
+
+		if (embeddings && embeddings.size >= 2 && embeddings.size <= MAX_PAIRWISE_NODES) {
+			this.showComputing();
+			const result = await computePairInsights(embeddings, graphData.links, maxSuggestions, {
+				onProgress: (done, total) => {
+					if (requestId === this.computeRequestId && total > 0) {
+						this.computingStatusEl?.setText(
+							`Computing insights… ${Math.round((done / total) * 100)}%`
+						);
+					}
+				},
+			});
+			// A newer setData() superseded this run while it was yielding.
+			if (requestId !== this.computeRequestId) return;
+			suggestions = result.suggestions;
+			duplicates = result.duplicates;
 		}
 
-		this.render();
+		this.computed = { suggestions, duplicates, orphans };
+		this.computingStatusEl = null;
+		this.callbacks.onSuggestions(suggestions);
+		if (this.open) {
+			this.render();
+		}
+	}
+
+	private showComputing(): void {
+		this.bodyEl.empty();
+		this.computingStatusEl = this.bodyEl.createDiv({
+			cls: "semantic-graph-insights-hint",
+			text: "Computing insights… 0%",
+		});
 	}
 
 	private render(): void {
