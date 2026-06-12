@@ -1,13 +1,18 @@
 # Obsidian 3D Semantic Graph
 
-Desktop-only Obsidian plugin that visualizes your notes in an interactive 3D space. Notes are positioned using OpenAI embeddings projected into 3D via UMAP or PCA, so semantically related notes cluster together. Without an API key, the plugin uses a folder-based clustered sphere layout with ConvexHull cluster regions.
+Desktop-only Obsidian plugin that visualizes your notes in an interactive 3D space. Notes are positioned using OpenAI or local Ollama embeddings projected into 3D via UMAP or PCA, so semantically related notes cluster together. Without embeddings, the plugin uses a folder-based clustered sphere layout with ConvexHull cluster regions.
 
 [Korean](./docs/README_KO.md)
 
 ## Features
 
-- **Semantic 3D layout** — OpenAI embeddings reduced to 3D coordinates via UMAP or PCA
-- **Clustered sphere fallback** — folder-based clustered layout with color-coded groups when no API key is set
+- **Semantic 3D layout** — OpenAI or Ollama embeddings reduced to 3D coordinates via UMAP or PCA
+- **Local embeddings (Ollama)** — run fully offline with a local Ollama server, no API key required
+- **Insights panel** — suggested links (semantically close but unlinked note pairs, drawn as dashed lines and insertable with one click), potential duplicates, orphan notes, and per-cluster MOC (Map of Content) generation
+- **Semantic neighbors sidebar** — a mini 3D view plus ranked list of the active note's nearest semantic neighbors
+- **Timeline playback** — replay your vault's growth over time by note creation date
+- **Interactive HTML export** — download the current graph as a standalone HTML file with deep links back into your vault
+- **Clustered sphere fallback** — folder-based clustered layout with color-coded groups when no embeddings are available
 - **ConvexHull cluster regions** — translucent 3D hulls that outline folder clusters (toggle: On / Hover / Off)
 - **Note links** — real links from Obsidian's resolved references, togglable from the toolbar
 - **Node coloring** — by folder or first tag
@@ -21,8 +26,14 @@ Desktop-only Obsidian plugin that visualizes your notes in an interactive 3D spa
 
 1. Markdown files are loaded from the vault, excluding folders listed in settings.
 2. Nodes are created from files; links are built from Obsidian's resolved note references.
-3. If an OpenAI API key or uploaded vectors are available, embeddings are projected to 3D with UMAP or PCA.
+3. If an embedding provider (OpenAI API key or local Ollama) or uploaded vectors are available, embeddings are projected to 3D with UMAP or PCA.
 4. Otherwise, a clustered sphere layout groups notes by top-level folder with ConvexHull regions.
+
+### Using Ollama (no API key)
+
+1. Install [Ollama](https://ollama.com) and pull an embedding model: `ollama pull nomic-embed-text`
+2. In **Settings → 3D Semantic Graph**, set **Embedding provider** to **Ollama (local)**.
+3. Open the graph — embeddings are generated locally and cached.
 
 ## Installation
 
@@ -52,7 +63,7 @@ npm run build  # production build
 
 ## Usage
 
-1. Open **Settings → 3D Semantic Graph** and optionally set an OpenAI API key or upload vectors.
+1. Open **Settings → 3D Semantic Graph** and optionally configure an embedding provider (OpenAI or Ollama) or upload vectors.
 2. Open the graph from the ribbon icon or the **Open 3D Semantic Graph** command.
 3. **Toolbar controls:**
    - **Refresh** — rebuild the graph
@@ -60,17 +71,25 @@ npm run build  # production build
    - **Links** — toggle link visibility
    - **Grid** — toggle XZ grid
    - **Clusters** — cycle cluster regions mode (On → Hover → Off)
+   - **Insights** — open the insights panel (suggested links, duplicates, orphans, MOC)
+   - **Timeline** — replay vault growth by note creation date
+   - **Export HTML** — download a standalone interactive HTML snapshot
 4. Click a node to select it. Shift-click to open the note.
+5. Open the **Semantic neighbors** sidebar with the **Open semantic neighbors** command to see the active note's nearest notes.
 
 ## Settings
 
 | Setting | Description | Default |
 | --- | --- | --- |
+| Embedding Provider | OpenAI (API key) or Ollama (local) | `openai` |
 | API Key | OpenAI API key for embedding generation | Empty |
-| Embedding Model | OpenAI embedding model | `text-embedding-3-large` |
+| Ollama Endpoint | Base URL of the local Ollama server | `http://localhost:11434` |
+| Embedding Model | Embedding model for the selected provider | `text-embedding-3-large` |
 | Custom Vector JSON | Upload/export vector JSON instead of API embeddings | Empty |
 | Projection Method | UMAP or PCA for dimensionality reduction | `umap` |
 | Layout Seed | Seed for deterministic layout | Random |
+| Suggested Links | Max suggested links in the insights panel | `20` |
+| Neighbor Count | Notes shown in the semantic neighbors sidebar | `10` |
 
 | Node Color By | Color nodes by folder or first tag | `folder` |
 | Show Links | Display link lines between notes | Off |
