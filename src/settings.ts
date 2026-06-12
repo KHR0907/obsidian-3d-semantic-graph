@@ -8,6 +8,7 @@ import {
 	isPathExcluded,
 	PluginSettings,
 	PRESET_EMBEDDING_MODELS,
+	SceneThemeSetting,
 } from "./types";
 import { serializeUploadedVectors, UPLOADED_VECTORS_FILE } from "./uploaded-vectors";
 
@@ -162,13 +163,14 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Scene theme")
-			.setDesc("Choose the background style for the scene. Default: light.")
+			.setDesc("Choose the background style for the scene. Auto follows the app theme. Default: auto.")
 			.addDropdown((dropdown) =>
 				dropdown
+					.addOption("auto", "Auto")
 					.addOption("dark", "Dark")
 					.addOption("light", "Light")
 					.setValue(this.plugin.settings.sceneTheme)
-					.onChange(async (value: "dark" | "light") => {
+					.onChange(async (value: SceneThemeSetting) => {
 						await this.patchSettings({ sceneTheme: value });
 					})
 			);

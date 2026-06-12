@@ -1,5 +1,12 @@
 export type EmbeddingProvider = "openai";
 
+export type SceneThemeSetting = "auto" | "dark" | "light";
+
+export const GRAPH_GROUP_COLORS: readonly string[] = [
+	"#6366f1", "#ec4899", "#14b8a6", "#f59e0b", "#8b5cf6",
+	"#ef4444", "#22c55e", "#3b82f6", "#f97316", "#06b6d4",
+];
+
 export interface PluginSettings {
 	embeddingProvider: EmbeddingProvider;
 	embeddingApiKey: string;
@@ -12,7 +19,7 @@ export interface PluginSettings {
 	showLinks: boolean;
 	showGrid: boolean;
 	showClusters: "on" | "hover" | "off";
-	sceneTheme: "dark" | "light";
+	sceneTheme: SceneThemeSetting;
 	nodeOpacity: number;
 	nodeSizeScale: number;
 	dragSensitivity: number;
@@ -38,7 +45,7 @@ export function createDefaultSettings(): PluginSettings {
 		showLinks: false,
 		showGrid: true,
 		showClusters: "hover",
-		sceneTheme: "light",
+		sceneTheme: "auto",
 		nodeOpacity: 1,
 		nodeSizeScale: 1.5,
 		dragSensitivity: 1,

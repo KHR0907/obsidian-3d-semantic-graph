@@ -1,10 +1,5 @@
 import { App, TFile } from "obsidian";
-import { GraphData, GraphNode, GraphLink, isPathExcluded, PluginSettings } from "./types";
-
-const FOLDER_COLORS = [
-	"#6366f1", "#ec4899", "#14b8a6", "#f59e0b", "#8b5cf6",
-	"#ef4444", "#22c55e", "#3b82f6", "#f97316", "#06b6d4",
-];
+import { GRAPH_GROUP_COLORS, GraphData, GraphNode, GraphLink, isPathExcluded, PluginSettings } from "./types";
 
 export function buildGraphData(app: App, settings: PluginSettings): GraphData {
 	const nodes: GraphNode[] = [];
@@ -20,7 +15,7 @@ export function buildGraphData(app: App, settings: PluginSettings): GraphData {
 	for (const file of files) {
 		const groupKey = getGroupKey(app, file, settings.nodeColorBy);
 		if (!colorMap.has(groupKey)) {
-			colorMap.set(groupKey, FOLDER_COLORS[colorIndex % FOLDER_COLORS.length]);
+			colorMap.set(groupKey, GRAPH_GROUP_COLORS[colorIndex % GRAPH_GROUP_COLORS.length]);
 			colorIndex++;
 		}
 

@@ -75,7 +75,7 @@ npm run build  # 프로덕션 빌드
 | Show Links | 노트 간 연결선 표시 | Off |
 | Show Grid | XZ 평면 그리드 표시 | On |
 | Show Clusters | ConvexHull 클러스터 영역 표시 모드 | `hover` |
-| Scene Theme | 다크 또는 라이트 배경 | `light` |
+| Scene Theme | 자동(앱 테마 따라가기), 다크, 라이트 배경 | `auto` |
 | Node Opacity | 노드 투명도 (0.15–1.0) | `1.0` |
 | Node Size | 노드 크기 배율 (0.4–2.0) | `1.5` |
 | Drag Sensitivity | 카메라 회전 감도 (0.2–3.0) | `1.0` |

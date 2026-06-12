@@ -1,10 +1,5 @@
-import { GraphNode } from "./types";
+import { GRAPH_GROUP_COLORS, GraphNode } from "./types";
 import { createSeededRandom } from "./seeded-rng";
-
-const CLUSTER_COLORS = [
-	"#6366f1", "#ec4899", "#14b8a6", "#f59e0b", "#8b5cf6",
-	"#ef4444", "#22c55e", "#3b82f6", "#f97316", "#06b6d4",
-];
 
 export interface ClusterRegion {
 	points: [number, number, number][];
@@ -30,7 +25,7 @@ export function createClusteredSphereLayout(
 
 	if (nodes.length === 0) return { positions, regions, nodeColors };
 	if (nodes.length === 1) {
-		const color = CLUSTER_COLORS[0];
+		const color = GRAPH_GROUP_COLORS[0];
 		positions.set(nodes[0].path, [0, 0, 0]);
 		nodeColors.set(nodes[0].path, color);
 		return { positions, regions, nodeColors };
@@ -75,10 +70,10 @@ export function createClusteredSphereLayout(
 	const colorIdx = new Array<number>(numGroups).fill(-1);
 	for (let i = 0; i < numGroups; i++) {
 		const used = new Set(adjacency[i].map((j) => colorIdx[j]).filter((c) => c >= 0));
-		for (let c = 0; c < CLUSTER_COLORS.length; c++) {
+		for (let c = 0; c < GRAPH_GROUP_COLORS.length; c++) {
 			if (!used.has(c)) { colorIdx[i] = c; break; }
 		}
-		if (colorIdx[i] === -1) colorIdx[i] = i % CLUSTER_COLORS.length;
+		if (colorIdx[i] === -1) colorIdx[i] = i % GRAPH_GROUP_COLORS.length;
 	}
 
 	// --- Place nodes & build regions ---
@@ -86,7 +81,7 @@ export function createClusteredSphereLayout(
 		const folder = folders[g];
 		const group = folderGroups.get(folder)!;
 		const [cx, cy, cz] = centroids[g];
-		const color = CLUSTER_COLORS[colorIdx[g]];
+		const color = GRAPH_GROUP_COLORS[colorIdx[g]];
 
 		const t1 = tangent(cx, cy, cz);
 		const t2 = cross([cx, cy, cz], t1);

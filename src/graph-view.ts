@@ -82,9 +82,21 @@ export class SemanticGraphView extends ItemView {
 		this.setToolbarTooltip(resetViewBtn, "Reset camera view");
 		resetViewBtn.addEventListener("click", () => this.renderer?.resetView());
 
-		this.linksToggleBtn = this.toolbar.createEl("button", { cls: "semantic-graph-btn" });
+		this.linksToggleBtn = this.toolbar.createEl("button", {
+			cls: "semantic-graph-btn semantic-graph-icon-btn",
+			attr: {
+				type: "button",
+				"aria-label": "Toggle links",
+			},
+		});
 		this.linksToggleBtn.addEventListener("click", () => void this.toggleLinks());
-		this.gridToggleBtn = this.toolbar.createEl("button", { cls: "semantic-graph-btn" });
+		this.gridToggleBtn = this.toolbar.createEl("button", {
+			cls: "semantic-graph-btn semantic-graph-icon-btn",
+			attr: {
+				type: "button",
+				"aria-label": "Toggle grid",
+			},
+		});
 		this.gridToggleBtn.addEventListener("click", () => void this.toggleGrid());
 		this.clustersToggleBtn = this.toolbar.createEl("button", {
 			cls: "semantic-graph-btn semantic-graph-icon-btn semantic-graph-clusters-btn",
@@ -109,6 +121,14 @@ export class SemanticGraphView extends ItemView {
 			}
 		});
 		this.resizeObserver.observe(this.graphContainer);
+
+		this.registerEvent(
+			this.app.workspace.on("css-change", () => {
+				if (this.settings.sceneTheme === "auto") {
+					this.renderer?.updateVisualOptions(this.getVisualOptions());
+				}
+			})
+		);
 
 		await this.loadGraph();
 	}
@@ -146,8 +166,11 @@ export class SemanticGraphView extends ItemView {
 		if (!this.linksToggleBtn) return;
 
 		this.linksToggleBtn.empty();
-		setIcon(this.linksToggleBtn, "map");
-		this.setToolbarTooltip(this.linksToggleBtn, this.settings.showLinks ? "Links on" : "Links off");
+		setIcon(this.linksToggleBtn, "link");
+		const linksLabel = this.settings.showLinks ? "Links on" : "Links off";
+		this.setToolbarTooltip(this.linksToggleBtn, linksLabel);
+		this.linksToggleBtn.setAttribute("aria-label", linksLabel);
+		this.linksToggleBtn.setAttribute("aria-pressed", String(this.settings.showLinks));
 		this.linksToggleBtn.classList.toggle("is-active", this.settings.showLinks);
 	}
 
@@ -156,7 +179,10 @@ export class SemanticGraphView extends ItemView {
 
 		this.gridToggleBtn.empty();
 		setIcon(this.gridToggleBtn, "layout-grid");
-		this.setToolbarTooltip(this.gridToggleBtn, this.settings.showGrid ? "Grid on" : "Grid off");
+		const gridLabel = this.settings.showGrid ? "Grid on" : "Grid off";
+		this.setToolbarTooltip(this.gridToggleBtn, gridLabel);
+		this.gridToggleBtn.setAttribute("aria-label", gridLabel);
+		this.gridToggleBtn.setAttribute("aria-pressed", String(this.settings.showGrid));
 		this.gridToggleBtn.classList.toggle("is-active", this.settings.showGrid);
 	}
 
@@ -505,9 +531,16 @@ export class SemanticGraphView extends ItemView {
 		return (this.hashPath(value) + 0.5) / 4294967296;
 	}
 
+	private resolveSceneTheme(settings: PluginSettings = this.settings): "dark" | "light" {
+		if (settings.sceneTheme === "dark" || settings.sceneTheme === "light") {
+			return settings.sceneTheme;
+		}
+		return document.body.classList.contains("theme-dark") ? "dark" : "light";
+	}
+
 	private getVisualOptions(settings: PluginSettings = this.settings): GraphVisualOptions {
 		return {
-			sceneTheme: settings.sceneTheme,
+			sceneTheme: this.resolveSceneTheme(settings),
 			nodeOpacity: settings.nodeOpacity,
 			nodeSizeScale: settings.nodeSizeScale,
 			dragSensitivity: settings.dragSensitivity,

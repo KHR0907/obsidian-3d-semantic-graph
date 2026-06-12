@@ -62,6 +62,10 @@ export default class SemanticGraphPlugin extends Plugin {
 			this.settings.embeddingModel = "text-embedding-3-large";
 		}
 
+		if (!["auto", "dark", "light"].includes(this.settings.sceneTheme)) {
+			this.settings.sceneTheme = "auto";
+		}
+
 		// Clean up legacy fields
 		const s = this.settings as unknown as Record<string, unknown>;
 		delete s.nodeAssetMode;

@@ -76,7 +76,7 @@ npm run build  # production build
 | Show Links | Display link lines between notes | Off |
 | Show Grid | Display XZ grid plane | On |
 | Show Clusters | ConvexHull cluster region visibility | `hover` |
-| Scene Theme | Dark or light background | `light` |
+| Scene Theme | Auto (match app theme), dark, or light background | `auto` |
 | Node Opacity | Node transparency (0.15–1.0) | `1.0` |
 | Node Size | Node size multiplier (0.4–2.0) | `1.5` |
 | Drag Sensitivity | Camera rotation sensitivity (0.2–3.0) | `1.0` |
