@@ -8,9 +8,9 @@ export interface EmbeddingProviderAdapter {
 }
 
 export function createEmbeddingProviderAdapter(settings: PluginSettings): EmbeddingProviderAdapter {
-	// Keep the adapter factory shape so additional providers can be added later
-	// without changing callers.
 	switch (settings.embeddingProvider) {
+		case "ollama":
+			return new OllamaEmbeddingAdapter(settings);
 		case "openai":
 			return new OpenAIEmbeddingAdapter(settings);
 	}
@@ -18,7 +18,7 @@ export function createEmbeddingProviderAdapter(settings: PluginSettings): Embedd
 
 abstract class BaseEmbeddingAdapter implements EmbeddingProviderAdapter {
 	abstract readonly provider: EmbeddingProvider;
-	readonly batchSize = 100;
+	readonly batchSize: number = 100;
 	protected readonly settings: PluginSettings;
 	protected readonly modelId: string;
 
@@ -57,6 +57,43 @@ class OpenAIEmbeddingAdapter extends BaseEmbeddingAdapter {
 		return response.json.data
 			.sort((a: { index: number }, b: { index: number }) => a.index - b.index)
 			.map((item: { embedding: number[] }) => item.embedding);
+	}
+}
+
+class OllamaEmbeddingAdapter extends BaseEmbeddingAdapter {
+	readonly provider = "ollama" as const;
+	readonly batchSize = 16;
+
+	async embed(texts: string[]): Promise<number[][]> {
+		const endpoint = this.settings.ollamaEndpoint.trim().replace(/\/+$/, "");
+		const response = await requestUrl({
+			url: `${endpoint}/api/embed`,
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				model: this.modelId,
+				input: texts,
+			}),
+			throw: false,
+		});
+
+		if (response.status !== 200) {
+			let detail = "";
+			try {
+				detail = response.json?.error ?? "";
+			} catch {
+				// Non-JSON error body
+			}
+			throw new Error(
+				`Ollama API error (${response.status}): ${detail || "Is Ollama running and the model pulled?"}`
+			);
+		}
+
+		const embeddings = response.json?.embeddings;
+		if (!Array.isArray(embeddings) || embeddings.length !== texts.length) {
+			throw new Error("Ollama returned an unexpected embedding response.");
+		}
+		return embeddings as number[][];
 	}
 }
 

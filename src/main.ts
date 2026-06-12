@@ -55,11 +55,13 @@ export default class SemanticGraphPlugin extends Plugin {
 			this.settings.embeddingApiKey = loaded.openaiApiKey;
 		}
 
-		// Force provider to openai
-		this.settings.embeddingProvider = "openai";
+		if (!["openai", "ollama"].includes(this.settings.embeddingProvider)) {
+			this.settings.embeddingProvider = "openai";
+		}
 
-		if (!isPresetEmbeddingModel("openai", this.settings.embeddingModel)) {
-			this.settings.embeddingModel = "text-embedding-3-large";
+		if (!isPresetEmbeddingModel(this.settings.embeddingProvider, this.settings.embeddingModel)) {
+			this.settings.embeddingModel =
+				this.settings.embeddingProvider === "ollama" ? "nomic-embed-text" : "text-embedding-3-large";
 		}
 
 		if (!["auto", "dark", "light"].includes(this.settings.sceneTheme)) {

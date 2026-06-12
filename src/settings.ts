@@ -4,7 +4,10 @@ import { EmbeddingService } from "./embedding";
 import {
 	clonePluginSettings,
 	createDefaultSettings,
+	EMBEDDING_PROVIDER_LABELS,
+	EmbeddingProvider,
 	generateRandomLayoutSeed,
+	getDefaultEmbeddingModel,
 	isPathExcluded,
 	PluginSettings,
 	PRESET_EMBEDDING_MODELS,
@@ -26,30 +29,64 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 
 		// --- Embeddings ---
 		new Setting(containerEl).setName("Embeddings").setHeading();
+
 		new Setting(containerEl)
-			.setName("Access key")
-			.setDesc("Access key for generating embeddings. Leave blank to use the sphere layout without semantic positioning.")
-			.addText((text) =>
-				text
-					.setPlaceholder("Paste your access key")
-					.setValue(this.plugin.settings.embeddingApiKey)
-					.then((t) => (t.inputEl.type = "password"))
-					.onChange(async (value) => {
-						await this.patchSettings({ embeddingApiKey: value.trim() });
-					})
-			);
+			.setName("Embedding provider")
+			.setDesc("OpenAI requires an access key. Ollama runs locally without a key.")
+			.addDropdown((dropdown) => {
+				(Object.keys(EMBEDDING_PROVIDER_LABELS) as EmbeddingProvider[]).forEach((provider) => {
+					dropdown.addOption(provider, EMBEDDING_PROVIDER_LABELS[provider]);
+				});
+				dropdown
+					.setValue(this.plugin.settings.embeddingProvider)
+					.onChange(async (value: EmbeddingProvider) => {
+						await this.patchSettings({
+							embeddingProvider: value,
+							embeddingModel: getDefaultEmbeddingModel(value),
+						});
+						this.display();
+					});
+			});
+
+		if (this.plugin.settings.embeddingProvider === "ollama") {
+			new Setting(containerEl)
+				.setName("Ollama endpoint")
+				.setDesc("Base URL of the local Ollama server. Default: http://localhost:11434.")
+				.addText((text) =>
+					text
+						.setPlaceholder("http://localhost:11434")
+						.setValue(this.plugin.settings.ollamaEndpoint)
+						.onChange(async (value) => {
+							await this.patchSettings({ ollamaEndpoint: value.trim() });
+						})
+				);
+		} else {
+			new Setting(containerEl)
+				.setName("Access key")
+				.setDesc("Access key for generating embeddings. Leave blank to use the sphere layout without semantic positioning.")
+				.addText((text) =>
+					text
+						.setPlaceholder("Paste your access key")
+						.setValue(this.plugin.settings.embeddingApiKey)
+						.then((t) => (t.inputEl.type = "password"))
+						.onChange(async (value) => {
+							await this.patchSettings({ embeddingApiKey: value.trim() });
+						})
+				);
+		}
 
 		new Setting(containerEl)
 			.setName("Embedding model")
-			.setDesc("Choose which model to use for embeddings.")
+			.setDesc(
+				this.plugin.settings.embeddingProvider === "ollama"
+					? "Choose which model to use for embeddings. Pull it first with `ollama pull <model>`."
+					: "Choose which model to use for embeddings."
+			)
 			.addDropdown((dropdown) =>
 				this.addEmbeddingModelOptions(dropdown)
 					.setValue(this.getSelectedEmbeddingOptionValue())
 					.onChange(async (value) => {
-						await this.patchSettings({
-							embeddingProvider: "openai",
-							embeddingModel: value,
-						});
+						await this.patchSettings({ embeddingModel: value });
 					})
 			);
 
@@ -308,16 +345,17 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 	}
 
 	private addEmbeddingModelOptions(dropdown: import("obsidian").DropdownComponent) {
-		PRESET_EMBEDDING_MODELS.openai.forEach((model) => {
+		PRESET_EMBEDDING_MODELS[this.plugin.settings.embeddingProvider].forEach((model) => {
 			dropdown.addOption(model, model);
 		});
 		return dropdown;
 	}
 
 	private getSelectedEmbeddingOptionValue(): string {
-		return PRESET_EMBEDDING_MODELS.openai.includes(this.plugin.settings.embeddingModel)
+		const presets = PRESET_EMBEDDING_MODELS[this.plugin.settings.embeddingProvider];
+		return presets.includes(this.plugin.settings.embeddingModel)
 			? this.plugin.settings.embeddingModel
-			: PRESET_EMBEDDING_MODELS.openai[0];
+			: presets[0];
 	}
 
 	private uploadVectorsJson(): void {
@@ -355,7 +393,11 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 				fileName = this.plugin.settings.uploadedVectorsFileName || UPLOADED_VECTORS_FILE;
 				noticeMessage = "Uploaded vector file exported.";
 			} else {
-				if (this.plugin.settings.embeddingApiKey.trim()) {
+				const s = this.plugin.settings;
+				const canGenerate = s.embeddingProvider === "ollama"
+					? Boolean(s.ollamaEndpoint.trim())
+					: Boolean(s.embeddingApiKey.trim());
+				if (canGenerate) {
 					new Notice("Generating vector file...");
 					const service = new EmbeddingService(this.app, this.plugin.settings, this.plugin.manifest.dir!);
 					const embeddings = await service.getEmbeddings();

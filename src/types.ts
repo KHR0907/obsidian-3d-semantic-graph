@@ -1,4 +1,4 @@
-export type EmbeddingProvider = "openai";
+export type EmbeddingProvider = "openai" | "ollama";
 
 export type SceneThemeSetting = "auto" | "dark" | "light";
 
@@ -11,7 +11,10 @@ export interface PluginSettings {
 	embeddingProvider: EmbeddingProvider;
 	embeddingApiKey: string;
 	embeddingModel: string;
+	ollamaEndpoint: string;
 	uploadedVectorsFileName: string;
+	suggestedLinkCount: number;
+	neighborCount: number;
 	projectionMethod: "umap" | "pca";
 	umapNNeighbors: number;
 	umapMinDist: number;
@@ -37,7 +40,10 @@ export function createDefaultSettings(): PluginSettings {
 		embeddingProvider: "openai",
 		embeddingApiKey: "",
 		embeddingModel: "text-embedding-3-large",
+		ollamaEndpoint: "http://localhost:11434",
 		uploadedVectorsFileName: "",
+		suggestedLinkCount: 20,
+		neighborCount: 10,
 		projectionMethod: "umap",
 		umapNNeighbors: 40,
 		umapMinDist: 0.8,
@@ -64,6 +70,7 @@ export function clonePluginSettings(settings: PluginSettings): PluginSettings {
 
 export const EMBEDDING_PROVIDER_LABELS: Record<EmbeddingProvider, string> = {
 	openai: "OpenAI",
+	ollama: "Ollama (local)",
 };
 
 export const PRESET_EMBEDDING_MODELS: Record<EmbeddingProvider, readonly string[]> = {
@@ -71,6 +78,11 @@ export const PRESET_EMBEDDING_MODELS: Record<EmbeddingProvider, readonly string[
 		"text-embedding-3-small",
 		"text-embedding-3-large",
 		"text-embedding-ada-002",
+	],
+	ollama: [
+		"nomic-embed-text",
+		"mxbai-embed-large",
+		"bge-m3",
 	],
 };
 
@@ -93,6 +105,9 @@ export function getEmbeddingCacheModelId(settings: PluginSettings): string {
 export function canGenerateEmbeddings(settings: PluginSettings): boolean {
 	if (settings.uploadedVectorsFileName.trim()) {
 		return true;
+	}
+	if (settings.embeddingProvider === "ollama") {
+		return Boolean(settings.ollamaEndpoint.trim());
 	}
 	return Boolean(settings.embeddingApiKey.trim());
 }
@@ -136,6 +151,7 @@ export interface GraphNode {
 	path: string;
 	color: string;
 	size: number;
+	ctime?: number;
 	x?: number;
 	y?: number;
 	z?: number;
