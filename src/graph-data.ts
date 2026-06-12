@@ -1,5 +1,6 @@
 import { App, TFile } from "obsidian";
 import { GRAPH_GROUP_COLORS, GraphData, GraphNode, GraphLink, isPathExcluded, PluginSettings } from "./types";
+import { resolveCreatedTime } from "./note-dates";
 
 export function buildGraphData(app: App, settings: PluginSettings): GraphData {
 	const nodes: GraphNode[] = [];
@@ -27,7 +28,7 @@ export function buildGraphData(app: App, settings: PluginSettings): GraphData {
 			path: file.path,
 			color: colorMap.get(groupKey)!,
 			size,
-			ctime: file.stat.ctime,
+			ctime: resolveCreatedTime(app.metadataCache.getFileCache(file)?.frontmatter, file.stat.ctime),
 		});
 
 		nodeSet.add(file.path);

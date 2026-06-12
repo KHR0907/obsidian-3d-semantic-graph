@@ -10,7 +10,7 @@ Desktop-only Obsidian plugin that visualizes your notes in an interactive 3D spa
 - **Local embeddings (Ollama)** — run fully offline with a local Ollama server, no API key required
 - **Insights panel** — suggested links (semantically close but unlinked note pairs, drawn as dashed lines and insertable with one click), potential duplicates, orphan notes, and per-cluster MOC (Map of Content) generation
 - **Semantic neighbors sidebar** — a mini 3D view plus ranked list of the active note's nearest semantic neighbors
-- **Timeline playback** — replay your vault's growth over time by note creation date
+- **Timeline playback** — replay your vault's growth over time by note creation date (frontmatter `created` / `date created` when present, file ctime otherwise)
 - **Interactive HTML export** — download the current graph as a standalone HTML file with deep links back into your vault
 - **Clustered sphere fallback** — folder-based clustered layout with color-coded groups when no embeddings are available
 - **ConvexHull cluster regions** — translucent 3D hulls that outline folder clusters (toggle: On / Hover / Off)
