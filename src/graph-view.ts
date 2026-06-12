@@ -1,8 +1,11 @@
 import { ItemView, Notice, TFile, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
-import { canGenerateEmbeddings, clonePluginSettings, GraphNode, GraphVisualOptions, PluginSettings } from "./types";
+import { canGenerateEmbeddings, clonePluginSettings, GraphData, GraphNode, GraphVisualOptions, PluginSettings } from "./types";
 import { createSeededRandom } from "./seeded-rng";
 import { buildGraphData } from "./graph-data";
 import { createClusteredSphereLayout, buildClusterRegions } from "./clustered-sphere-layout";
+import { InsightsPanel } from "./insights-panel";
+import { SuggestedLink } from "./insights";
+import { SuggestionSegment } from "./graph-scene-renderer";
 
 export const VIEW_TYPE = "semantic-graph-3d";
 
@@ -31,6 +34,9 @@ export class SemanticGraphView extends ItemView {
 	private linksToggleBtn: HTMLButtonElement | null = null;
 	private gridToggleBtn: HTMLButtonElement | null = null;
 	private clustersToggleBtn: HTMLButtonElement | null = null;
+	private insightsBtn: HTMLButtonElement | null = null;
+	private insightsPanel: InsightsPanel | null = null;
+	private lastGraphData: GraphData | null = null;
 	private loadRequestId = 0;
 
 	constructor(
@@ -106,6 +112,16 @@ export class SemanticGraphView extends ItemView {
 			},
 		});
 		this.clustersToggleBtn.addEventListener("click", () => void this.toggleClusters());
+		this.insightsBtn = this.toolbar.createEl("button", {
+			cls: "semantic-graph-btn semantic-graph-icon-btn",
+			attr: {
+				type: "button",
+				"aria-label": "Toggle insights",
+			},
+		});
+		setIcon(this.insightsBtn, "lightbulb");
+		this.setToolbarTooltip(this.insightsBtn, "Insights");
+		this.insightsBtn.addEventListener("click", () => this.insightsPanel?.toggle());
 		this.updateLinksToggleButton();
 		this.updateGridToggleButton();
 		this.updateClustersToggleButton();
@@ -113,6 +129,14 @@ export class SemanticGraphView extends ItemView {
 		this.statusEl = this.toolbar.createSpan({ cls: "semantic-graph-status" });
 		this.graphContainer = container.createDiv({ cls: "semantic-graph-canvas" });
 		this.graphStage = this.graphContainer.createDiv({ cls: "semantic-graph-stage" });
+		this.insightsPanel = new InsightsPanel(this.app, this.graphContainer, {
+			onOpenNote: (path) => this.openNote(path),
+			onSuggestions: (suggestions) => this.applySuggestionOverlay(suggestions),
+			onVisibilityChange: (open) => {
+				this.renderer?.setSuggestionsVisible(open);
+				this.insightsBtn?.classList.toggle("is-active", open);
+			},
+		});
 
 		this.resizeObserver = new ResizeObserver(() => {
 			if (this.renderer && this.graphStage) {
@@ -135,6 +159,8 @@ export class SemanticGraphView extends ItemView {
 
 	onClose(): Promise<void> {
 		this.resizeObserver?.disconnect();
+		this.insightsPanel?.dispose();
+		this.insightsPanel = null;
 		this.renderer?.dispose();
 		this.renderer = null;
 		return Promise.resolve();
@@ -251,6 +277,27 @@ export class SemanticGraphView extends ItemView {
 		if (file instanceof TFile) void this.app.workspace.getLeaf(false).openFile(file);
 	}
 
+	private applySuggestionOverlay(suggestions: SuggestedLink[]): void {
+		if (!this.renderer || !this.lastGraphData) return;
+
+		const positions = new Map<string, [number, number, number]>();
+		for (const node of this.lastGraphData.nodes) {
+			if (node.x != null && node.y != null && node.z != null) {
+				positions.set(node.path, [node.x, node.y, node.z]);
+			}
+		}
+
+		const segments: SuggestionSegment[] = [];
+		for (const suggestion of suggestions) {
+			const from = positions.get(suggestion.source);
+			const to = positions.get(suggestion.target);
+			if (from && to) {
+				segments.push({ source: suggestion.source, target: suggestion.target, from, to });
+			}
+		}
+		this.renderer.setSuggestionLinks(segments);
+	}
+
 	private syncSettingsFromSource(): void {
 		this.settings = clonePluginSettings(this.getLatestSettings());
 		this.renderer?.setLinksVisible(this.settings.showLinks);
@@ -305,6 +352,7 @@ export class SemanticGraphView extends ItemView {
 			const spherePositions = this.createSphereLayout(graphData.nodes, layoutRadius, settings);
 			let finalPositions = spherePositions;
 			let clusterResult: import("./clustered-sphere-layout").ClusteredSphereResult | null = null;
+			let loadedEmbeddings: Map<string, number[]> | null = null;
 
 			if (canGenerateEmbeddings(settings)) {
 				try {
@@ -312,6 +360,7 @@ export class SemanticGraphView extends ItemView {
 						? await this.loadUploadedEmbeddingVectors()
 						: await this.loadProviderEmbeddings(settings);
 					if (!isCurrentRequest()) return;
+					loadedEmbeddings = embeddings;
 
 					if (embeddings.size >= 3) {
 						const paths = Array.from(embeddings.keys());
@@ -387,6 +436,15 @@ export class SemanticGraphView extends ItemView {
 				: buildClusterRegions(graphData.nodes);
 			this.renderer.setClusterRegions(regions);
 			this.renderer.setClustersMode(this.getClustersMode(settings));
+
+			this.lastGraphData = graphData;
+			this.renderer.setSuggestionsVisible(this.insightsPanel?.isOpen() ?? false);
+			this.insightsPanel?.setData({
+				graphData,
+				embeddings: loadedEmbeddings,
+				regions,
+				maxSuggestions: settings.suggestedLinkCount,
+			});
 		} catch (err: unknown) {
 			if (!isCurrentRequest()) return;
 			console.error("Semantic Graph error:", err);
