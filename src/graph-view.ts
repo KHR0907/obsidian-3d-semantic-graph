@@ -13,6 +13,8 @@ const MIN_SCENE_EXTENT = 960;
 const LAYOUT_RADIUS_RATIO = 0.45;
 const MIN_NODE_DISTANCE = 14;
 const TOOLTIP_DELAY_MS = 150;
+const TIMELINE_RESOLUTION = 1000;
+const TIMELINE_PLAY_DURATION_MS = 15000;
 const CLUSTERS_MODE_TOOLTIPS = {
 	on: "Clusters on",
 	off: "Clusters off",
@@ -37,6 +39,13 @@ export class SemanticGraphView extends ItemView {
 	private insightsBtn: HTMLButtonElement | null = null;
 	private insightsPanel: InsightsPanel | null = null;
 	private lastGraphData: GraphData | null = null;
+	private timelineBtn: HTMLButtonElement | null = null;
+	private timelineBar: HTMLElement | null = null;
+	private timelineSlider: HTMLInputElement | null = null;
+	private timelineLabel: HTMLElement | null = null;
+	private timelinePlayBtn: HTMLButtonElement | null = null;
+	private timelinePlaying = false;
+	private timelineFrame: number | null = null;
 	private loadRequestId = 0;
 
 	constructor(
@@ -122,6 +131,16 @@ export class SemanticGraphView extends ItemView {
 		setIcon(this.insightsBtn, "lightbulb");
 		this.setToolbarTooltip(this.insightsBtn, "Insights");
 		this.insightsBtn.addEventListener("click", () => this.insightsPanel?.toggle());
+		this.timelineBtn = this.toolbar.createEl("button", {
+			cls: "semantic-graph-btn semantic-graph-icon-btn",
+			attr: {
+				type: "button",
+				"aria-label": "Toggle timeline",
+			},
+		});
+		setIcon(this.timelineBtn, "history");
+		this.setToolbarTooltip(this.timelineBtn, "Timeline");
+		this.timelineBtn.addEventListener("click", () => this.toggleTimeline());
 		this.updateLinksToggleButton();
 		this.updateGridToggleButton();
 		this.updateClustersToggleButton();
@@ -137,6 +156,32 @@ export class SemanticGraphView extends ItemView {
 				this.insightsBtn?.classList.toggle("is-active", open);
 			},
 		});
+
+		this.timelineBar = container.createDiv({ cls: "semantic-graph-timeline" });
+		this.timelineBar.hide();
+		this.timelinePlayBtn = this.timelineBar.createEl("button", {
+			cls: "semantic-graph-btn semantic-graph-icon-btn",
+			attr: {
+				type: "button",
+				"aria-label": "Play timeline",
+			},
+		});
+		setIcon(this.timelinePlayBtn, "play");
+		this.timelinePlayBtn.addEventListener("click", () => this.toggleTimelinePlayback());
+		this.timelineSlider = this.timelineBar.createEl("input", {
+			cls: "semantic-graph-timeline-slider",
+			attr: {
+				type: "range",
+				min: "0",
+				max: String(TIMELINE_RESOLUTION),
+				value: String(TIMELINE_RESOLUTION),
+			},
+		});
+		this.timelineSlider.addEventListener("input", () => {
+			this.stopTimelinePlayback();
+			this.applyTimelineFromSlider();
+		});
+		this.timelineLabel = this.timelineBar.createSpan({ cls: "semantic-graph-timeline-label" });
 
 		this.resizeObserver = new ResizeObserver(() => {
 			if (this.renderer && this.graphStage) {
@@ -159,6 +204,7 @@ export class SemanticGraphView extends ItemView {
 
 	onClose(): Promise<void> {
 		this.resizeObserver?.disconnect();
+		this.stopTimelinePlayback();
 		this.insightsPanel?.dispose();
 		this.insightsPanel = null;
 		this.renderer?.dispose();
@@ -275,6 +321,89 @@ export class SemanticGraphView extends ItemView {
 	private openNote(path: string): void {
 		const file = this.app.vault.getAbstractFileByPath(path);
 		if (file instanceof TFile) void this.app.workspace.getLeaf(false).openFile(file);
+	}
+
+	private toggleTimeline(): void {
+		if (!this.timelineBar) return;
+
+		if (this.timelineBar.isShown()) {
+			this.stopTimelinePlayback();
+			this.timelineBar.hide();
+			this.timelineBtn?.classList.remove("is-active");
+			this.renderer?.setTimeFilter(null);
+		} else {
+			this.timelineBar.show();
+			this.timelineBtn?.classList.add("is-active");
+			this.applyTimelineFromSlider();
+		}
+	}
+
+	private getTimelineRange(): { min: number; max: number } | null {
+		let min = Infinity;
+		let max = -Infinity;
+		for (const node of this.lastGraphData?.nodes ?? []) {
+			if (node.ctime === undefined) continue;
+			if (node.ctime < min) min = node.ctime;
+			if (node.ctime > max) max = node.ctime;
+		}
+		if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) return null;
+		return { min, max };
+	}
+
+	private applyTimelineFromSlider(): void {
+		if (!this.timelineSlider || !this.renderer) return;
+
+		const range = this.getTimelineRange();
+		if (!range) {
+			this.renderer.setTimeFilter(null);
+			this.timelineLabel?.setText("No creation dates available");
+			return;
+		}
+
+		const t = Number(this.timelineSlider.value) / TIMELINE_RESOLUTION;
+		const cutoff = range.min + (range.max - range.min) * t;
+		this.renderer.setTimeFilter(t >= 1 ? null : cutoff);
+		this.timelineLabel?.setText(new Date(cutoff).toLocaleDateString());
+	}
+
+	private toggleTimelinePlayback(): void {
+		if (this.timelinePlaying) {
+			this.stopTimelinePlayback();
+			return;
+		}
+		if (!this.timelineSlider) return;
+
+		this.timelinePlaying = true;
+		if (this.timelinePlayBtn) setIcon(this.timelinePlayBtn, "pause");
+
+		let startValue = Number(this.timelineSlider.value);
+		if (startValue >= TIMELINE_RESOLUTION) startValue = 0;
+		const startTime = performance.now();
+
+		const tick = (now: number) => {
+			if (!this.timelinePlaying || !this.timelineSlider) return;
+
+			const progress = ((now - startTime) / TIMELINE_PLAY_DURATION_MS) * TIMELINE_RESOLUTION;
+			const value = Math.min(TIMELINE_RESOLUTION, startValue + progress);
+			this.timelineSlider.value = String(Math.round(value));
+			this.applyTimelineFromSlider();
+
+			if (value >= TIMELINE_RESOLUTION) {
+				this.stopTimelinePlayback();
+				return;
+			}
+			this.timelineFrame = window.requestAnimationFrame(tick);
+		};
+		this.timelineFrame = window.requestAnimationFrame(tick);
+	}
+
+	private stopTimelinePlayback(): void {
+		this.timelinePlaying = false;
+		if (this.timelineFrame !== null) {
+			window.cancelAnimationFrame(this.timelineFrame);
+			this.timelineFrame = null;
+		}
+		if (this.timelinePlayBtn) setIcon(this.timelinePlayBtn, "play");
 	}
 
 	private applySuggestionOverlay(suggestions: SuggestedLink[]): void {
@@ -445,6 +574,9 @@ export class SemanticGraphView extends ItemView {
 				regions,
 				maxSuggestions: settings.suggestedLinkCount,
 			});
+			if (this.timelineBar?.isShown()) {
+				this.applyTimelineFromSlider();
+			}
 		} catch (err: unknown) {
 			if (!isCurrentRequest()) return;
 			console.error("Semantic Graph error:", err);

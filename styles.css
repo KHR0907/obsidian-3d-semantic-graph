@@ -259,6 +259,29 @@
 	padding: 2px 0;
 }
 
+.semantic-graph-timeline {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 12px;
+	border-top: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	flex-shrink: 0;
+}
+
+.semantic-graph-timeline-slider {
+	flex: 1;
+	min-width: 0;
+}
+
+.semantic-graph-timeline-label {
+	font-size: 12px;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	min-width: 90px;
+	text-align: right;
+}
+
 .semantic-graph-error {
 	display: flex;
 	align-items: center;
