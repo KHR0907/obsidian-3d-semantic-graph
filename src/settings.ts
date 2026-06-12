@@ -1,4 +1,12 @@
-import { App, Notice, normalizePath, PluginSettingTab, Setting, TFile } from "obsidian";
+import {
+	App,
+	Notice,
+	Setting,
+	SettingDefinitionItem,
+	normalizePath,
+	PluginSettingTab,
+	TFile,
+} from "obsidian";
 import SemanticGraphPlugin from "./main";
 import { EmbeddingService } from "./embedding";
 import {
@@ -11,7 +19,6 @@ import {
 	isPathExcluded,
 	PluginSettings,
 	PRESET_EMBEDDING_MODELS,
-	SceneThemeSetting,
 } from "./types";
 import { serializeUploadedVectors, UPLOADED_VECTORS_FILE } from "./uploaded-vectors";
 
@@ -23,338 +30,283 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		const settings = this.plugin.settings;
 
-		// --- Embeddings ---
-		new Setting(containerEl).setName("Embeddings").setHeading();
+		return [
+			{
+				type: "group",
+				heading: "Embeddings",
+				items: [
+					{
+						name: "Embedding provider",
+						desc: "OpenAI requires an access key. Ollama runs locally without a key.",
+						control: {
+							type: "dropdown",
+							key: "embeddingProvider",
+							options: { ...EMBEDDING_PROVIDER_LABELS },
+						},
+					},
+					{
+						name: "Ollama endpoint",
+						desc: "Base URL of the local Ollama server. Default: http://localhost:11434.",
+						visible: () => this.plugin.settings.embeddingProvider === "ollama",
+						control: {
+							type: "text",
+							key: "ollamaEndpoint",
+							placeholder: "http://localhost:11434",
+						},
+					},
+					{
+						name: "Access key",
+						desc: "Access key for generating embeddings. Leave blank to use the sphere layout without semantic positioning.",
+						visible: () => this.plugin.settings.embeddingProvider !== "ollama",
+						render: (setting: Setting) => {
+							setting.addText((text) =>
+								text
+									.setPlaceholder("Paste your access key")
+									.setValue(this.plugin.settings.embeddingApiKey)
+									.then((t) => (t.inputEl.type = "password"))
+									.onChange(async (value) => {
+										await this.patchSettings({ embeddingApiKey: value.trim() });
+									})
+							);
+						},
+					},
+					{
+						name: "Embedding model",
+						desc:
+							settings.embeddingProvider === "ollama"
+								? "Choose which model to use for embeddings. Pull it first with `ollama pull <model>`."
+								: "Choose which model to use for embeddings.",
+						control: {
+							type: "dropdown",
+							key: "embeddingModel",
+							options: Object.fromEntries(
+								PRESET_EMBEDDING_MODELS[settings.embeddingProvider].map((model) => [model, model])
+							),
+						},
+					},
+					{
+						name: "Vector file",
+						desc: "Use an uploaded vector file instead of generated embeddings.",
+						render: (setting: Setting) => {
+							setting
+								.addButton((button) =>
+									button
+										.setButtonText("Export")
+										.setTooltip("Download vectors as a compatible file")
+										.onClick(() => void this.exportVectorsJson())
+								)
+								.addButton((button) =>
+									button
+										.setButtonText(this.plugin.settings.uploadedVectorsFileName ? "Upload again" : "Upload")
+										.onClick(() => void this.uploadVectorsJson())
+								)
+								.addText((text) =>
+									text
+										.setPlaceholder("Uploaded file name")
+										.setValue(this.plugin.settings.uploadedVectorsFileName)
+										.setDisabled(true)
+								)
+								.addExtraButton((button) =>
+									button
+										.setIcon("cross")
+										.setTooltip("Clear uploaded vectors reference")
+										.onClick(async () => {
+											await this.patchSettings({ uploadedVectorsFileName: "" });
+											this.update();
+										})
+								);
+						},
+					},
+				],
+			},
+			{
+				type: "group",
+				heading: "Graph",
+				items: [
+					{
+						name: "Node color by",
+						desc: "How to assign colors to nodes. Default: folder.",
+						control: {
+							type: "dropdown",
+							key: "nodeColorBy",
+							options: { folder: "Folder", tag: "First tag" },
+						},
+					},
+					{
+						name: "Projection method",
+						desc: "Choose how embeddings are projected into space. Default: mapped layout.",
+						control: {
+							type: "dropdown",
+							key: "projectionMethod",
+							options: { umap: "Mapped layout", pca: "Principal components" },
+						},
+					},
+					{
+						name: "Layout seed",
+						desc: "Seed used for layout steps and overlap resolution. Using the same seed makes the layout more repeatable. Default: random.",
+						render: (setting: Setting) => {
+							setting
+								.addButton((button) =>
+									button.setButtonText("Random").onClick(async () => {
+										await this.patchSettings({ layoutSeed: generateRandomLayoutSeed() });
+										this.update();
+									})
+								)
+								.addText((text) =>
+									text
+										.setPlaceholder("12345")
+										.setValue(String(this.plugin.settings.layoutSeed))
+										.then((t) => (t.inputEl.type = "number"))
+										.onChange(async (value) => {
+											const parsed = Number.parseInt(value, 10);
+											await this.patchSettings({
+												layoutSeed: Number.isFinite(parsed) ? parsed : generateRandomLayoutSeed(),
+											});
+										})
+								);
+						},
+					},
+					{
+						name: "Show links",
+						desc: "Display connection lines between nodes. Default: off.",
+						control: { type: "toggle", key: "showLinks" },
+					},
+					{
+						name: "Show grid",
+						desc: "Display a solid square grid on the ground plane. Default: on.",
+						control: { type: "toggle", key: "showGrid" },
+					},
+				],
+			},
+			{
+				type: "group",
+				heading: "Appearance",
+				items: [
+					{
+						name: "Scene theme",
+						desc: "Choose the background style for the scene. Auto follows the app theme. Default: auto.",
+						control: {
+							type: "dropdown",
+							key: "sceneTheme",
+							options: { auto: "Auto", dark: "Dark", light: "Light" },
+						},
+					},
+					{
+						name: "Node opacity",
+						desc: "Adjust node transparency. Default: 1.0.",
+						control: { type: "slider", key: "nodeOpacity", min: 0.15, max: 1, step: 0.05 },
+					},
+					{
+						name: "Node size",
+						desc: "Adjust the size of nodes. Default: 1.5.",
+						control: { type: "slider", key: "nodeSizeScale", min: 0.4, max: 2, step: 0.05 },
+					},
+					{
+						name: "Drag sensitivity",
+						desc: "Adjust how strongly the camera responds when dragging the graph. Default: 1.0.",
+						control: { type: "slider", key: "dragSensitivity", min: 0.2, max: 3, step: 0.1 },
+					},
+					{
+						name: "Auto orbit speed",
+						desc: "Adjust the idle camera orbit speed. Set to 0 to disable automatic camera movement. Default: 0.2.",
+						control: { type: "slider", key: "autoOrbitSpeed", min: 0, max: 3, step: 0.1 },
+					},
+					{
+						name: "Suggested links",
+						desc: "Maximum number of suggested links shown in the insights panel. Default: 20.",
+						control: { type: "slider", key: "suggestedLinkCount", min: 5, max: 100, step: 5 },
+					},
+					{
+						name: "Neighbor count",
+						desc: "Number of notes shown in the semantic neighbors sidebar. Default: 10.",
+						control: { type: "slider", key: "neighborCount", min: 3, max: 30, step: 1 },
+					},
+					{
+						name: "Exclude folders",
+						desc: "Comma-separated list of folders to exclude from the graph.",
+						control: {
+							type: "text",
+							key: "excludeFolders",
+							placeholder: "Templates, daily-notes",
+						},
+					},
+				],
+			},
+			{
+				type: "group",
+				heading: "Projection tuning",
+				items: [
+					{
+						name: "Number of neighbors",
+						desc: "Controls local vs global structure (5-50). Lower = tighter clusters, higher = broader spread. Default: 30.",
+						control: { type: "slider", key: "umapNNeighbors", min: 5, max: 50, step: 1 },
+					},
+					{
+						name: "Minimum distance",
+						desc: "How tightly similar points are packed (0.0-0.99). Lower values create tighter clusters. Default: 0.80.",
+						control: { type: "slider", key: "umapMinDist", min: 0, max: 0.99, step: 0.01 },
+					},
+				],
+			},
+			{
+				type: "group",
+				heading: "Reset",
+				items: [
+					{
+						name: "Reset to defaults",
+						desc: "Restore all settings to their default values. The access key is preserved.",
+						render: (setting: Setting) => {
+							setting.addButton((button) =>
+								button
+									.setButtonText("Reset")
+									.setDestructive()
+									.onClick(async () => {
+										const apiKey = this.plugin.settings.embeddingApiKey;
+										await this.replaceSettings({
+											...createDefaultSettings(),
+											embeddingApiKey: apiKey,
+										});
+										this.update();
+									})
+							);
+						},
+					},
+				],
+			},
+		];
+	}
 
-		new Setting(containerEl)
-			.setName("Embedding provider")
-			.setDesc("OpenAI requires an access key. Ollama runs locally without a key.")
-			.addDropdown((dropdown) => {
-				(Object.keys(EMBEDDING_PROVIDER_LABELS) as EmbeddingProvider[]).forEach((provider) => {
-					dropdown.addOption(provider, EMBEDDING_PROVIDER_LABELS[provider]);
-				});
-				dropdown
-					.setValue(this.plugin.settings.embeddingProvider)
-					.onChange(async (value: EmbeddingProvider) => {
-						await this.patchSettings({
-							embeddingProvider: value,
-							embeddingModel: getDefaultEmbeddingModel(value),
-						});
-						this.display();
-					});
-			});
-
-		if (this.plugin.settings.embeddingProvider === "ollama") {
-			new Setting(containerEl)
-				.setName("Ollama endpoint")
-				.setDesc("Base URL of the local Ollama server. Default: http://localhost:11434.")
-				.addText((text) =>
-					text
-						.setPlaceholder("http://localhost:11434")
-						.setValue(this.plugin.settings.ollamaEndpoint)
-						.onChange(async (value) => {
-							await this.patchSettings({ ollamaEndpoint: value.trim() });
-						})
-				);
-		} else {
-			new Setting(containerEl)
-				.setName("Access key")
-				.setDesc("Access key for generating embeddings. Leave blank to use the sphere layout without semantic positioning.")
-				.addText((text) =>
-					text
-						.setPlaceholder("Paste your access key")
-						.setValue(this.plugin.settings.embeddingApiKey)
-						.then((t) => (t.inputEl.type = "password"))
-						.onChange(async (value) => {
-							await this.patchSettings({ embeddingApiKey: value.trim() });
-						})
-				);
+	getControlValue(key: string): unknown {
+		if (key === "excludeFolders") {
+			return this.plugin.settings.excludeFolders.join(", ");
 		}
+		return (this.plugin.settings as unknown as Record<string, unknown>)[key];
+	}
 
-		new Setting(containerEl)
-			.setName("Embedding model")
-			.setDesc(
-				this.plugin.settings.embeddingProvider === "ollama"
-					? "Choose which model to use for embeddings. Pull it first with `ollama pull <model>`."
-					: "Choose which model to use for embeddings."
-			)
-			.addDropdown((dropdown) =>
-				this.addEmbeddingModelOptions(dropdown)
-					.setValue(this.getSelectedEmbeddingOptionValue())
-					.onChange(async (value) => {
-						await this.patchSettings({ embeddingModel: value });
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Vector file")
-			.setDesc("Use an uploaded vector file instead of generated embeddings.")
-			.addButton((button) =>
-				button
-					.setButtonText("Export")
-					.setTooltip("Download vectors as a compatible file")
-					.onClick(() => void this.exportVectorsJson())
-			)
-			.addButton((button) =>
-				button
-					.setButtonText(this.plugin.settings.uploadedVectorsFileName ? "Upload again" : "Upload")
-					.onClick(() => void this.uploadVectorsJson())
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("Uploaded file name")
-					.setValue(this.plugin.settings.uploadedVectorsFileName)
-					.setDisabled(true)
-			)
-			.addExtraButton((button) =>
-				button
-					.setIcon("cross")
-					.setTooltip("Clear uploaded vectors reference")
-					.onClick(async () => {
-						await this.patchSettings({ uploadedVectorsFileName: "" });
-						this.display();
-					})
-			);
-
-		// --- Graph Settings ---
-		new Setting(containerEl).setName("Graph").setHeading();
-
-		new Setting(containerEl)
-			.setName("Node color by")
-			.setDesc("How to assign colors to nodes. Default: folder.")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("folder", "Folder")
-					.addOption("tag", "First tag")
-					.setValue(this.plugin.settings.nodeColorBy)
-					.onChange(async (value: "folder" | "tag") => {
-						await this.patchSettings({ nodeColorBy: value });
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Projection method")
-			.setDesc("Choose how embeddings are projected into space. Default: mapped layout.")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("umap", "Mapped layout")
-					.addOption("pca", "Principal components")
-					.setValue(this.plugin.settings.projectionMethod)
-					.onChange(async (value: "umap" | "pca") => {
-						await this.patchSettings({ projectionMethod: value });
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Layout seed")
-			.setDesc("Seed used for layout steps and overlap resolution. Using the same seed makes the layout more repeatable. Default: random.")
-			.addButton((button) =>
-				button
-					.setButtonText("Random")
-					.onClick(async () => {
-						const nextSeed = generateRandomLayoutSeed();
-						await this.patchSettings({ layoutSeed: nextSeed });
-						this.display();
-					})
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("12345")
-					.setValue(String(this.plugin.settings.layoutSeed))
-					.then((t) => (t.inputEl.type = "number"))
-					.onChange(async (value) => {
-						const parsed = Number.parseInt(value, 10);
-						await this.patchSettings({
-							layoutSeed: Number.isFinite(parsed) ? parsed : generateRandomLayoutSeed(),
-						});
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Show links")
-			.setDesc("Display connection lines between nodes. Default: off.")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.showLinks)
-					.onChange(async (value) => {
-						await this.patchSettings({ showLinks: value });
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Show grid")
-			.setDesc("Display a solid square grid on the ground plane. Default: on.")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.showGrid)
-					.onChange(async (value) => {
-						await this.patchSettings({ showGrid: value });
-					})
-			);
-
-		new Setting(containerEl).setName("Appearance").setHeading();
-
-		new Setting(containerEl)
-			.setName("Scene theme")
-			.setDesc("Choose the background style for the scene. Auto follows the app theme. Default: auto.")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("auto", "Auto")
-					.addOption("dark", "Dark")
-					.addOption("light", "Light")
-					.setValue(this.plugin.settings.sceneTheme)
-					.onChange(async (value: SceneThemeSetting) => {
-						await this.patchSettings({ sceneTheme: value });
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Node opacity")
-			.setDesc("Adjust node transparency. Default: 1.0.")
-			.addSlider((slider) =>
-				slider
-					.setLimits(0.15, 1, 0.05)
-					.setValue(this.plugin.settings.nodeOpacity)
-					.setDynamicTooltip()
-					.onChange(async (value) => {
-						await this.patchSettings({ nodeOpacity: value });
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Node size")
-			.setDesc("Adjust the size of nodes. Default: 1.5.")
-			.addSlider((slider) =>
-				slider
-					.setLimits(0.4, 2, 0.05)
-					.setValue(this.plugin.settings.nodeSizeScale)
-					.setDynamicTooltip()
-					.onChange(async (value) => {
-						await this.patchSettings({ nodeSizeScale: value });
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Drag sensitivity")
-			.setDesc("Adjust how strongly the camera responds when dragging the graph. Default: 1.0.")
-			.addSlider((slider) =>
-				slider
-					.setLimits(0.2, 3, 0.1)
-					.setValue(this.plugin.settings.dragSensitivity)
-					.setDynamicTooltip()
-					.onChange(async (value) => {
-						await this.patchSettings({ dragSensitivity: value });
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Auto orbit speed")
-			.setDesc("Adjust the idle camera orbit speed. Set to 0 to disable automatic camera movement. Default: 0.2.")
-			.addSlider((slider) =>
-				slider
-					.setLimits(0, 3, 0.1)
-					.setValue(this.plugin.settings.autoOrbitSpeed)
-					.setDynamicTooltip()
-					.onChange(async (value) => {
-						await this.patchSettings({ autoOrbitSpeed: value });
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Suggested links")
-			.setDesc("Maximum number of suggested links shown in the insights panel. Default: 20.")
-			.addSlider((slider) =>
-				slider
-					.setLimits(5, 100, 5)
-					.setValue(this.plugin.settings.suggestedLinkCount)
-					.setDynamicTooltip()
-					.onChange(async (value) => {
-						await this.patchSettings({ suggestedLinkCount: value });
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Neighbor count")
-			.setDesc("Number of notes shown in the semantic neighbors sidebar. Default: 10.")
-			.addSlider((slider) =>
-				slider
-					.setLimits(3, 30, 1)
-					.setValue(this.plugin.settings.neighborCount)
-					.setDynamicTooltip()
-					.onChange(async (value) => {
-						await this.patchSettings({ neighborCount: value });
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Exclude folders")
-			.setDesc("Comma-separated list of folders to exclude from the graph.")
-			.addText((text) =>
-				text
-					.setPlaceholder("Templates, daily-notes")
-					.setValue(this.plugin.settings.excludeFolders.join(", "))
-					.onChange(async (value) => {
-						await this.patchSettings({
-							excludeFolders: value
-								.split(",")
-								.map((s) => s.trim())
-								.filter((s) => s.length > 0),
-						});
-					})
-			);
-
-		// --- Projection tuning ---
-		new Setting(containerEl).setName("Projection tuning").setHeading();
-
-		new Setting(containerEl)
-			.setName("Number of neighbors")
-			.setDesc("Controls local vs global structure (5-50). Lower = tighter clusters, higher = broader spread. Default: 30.")
-			.addSlider((slider) =>
-				slider
-					.setLimits(5, 50, 1)
-					.setValue(this.plugin.settings.umapNNeighbors)
-					.setDynamicTooltip()
-					.onChange(async (value) => {
-						await this.patchSettings({ umapNNeighbors: value });
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Minimum distance")
-			.setDesc("How tightly similar points are packed (0.0-0.99). Lower values create tighter clusters. Default: 0.80.")
-			.addSlider((slider) =>
-				slider
-					.setLimits(0, 0.99, 0.01)
-					.setValue(this.plugin.settings.umapMinDist)
-					.setDynamicTooltip()
-					.onChange(async (value) => {
-						await this.patchSettings({ umapMinDist: value });
-					})
-			);
-
-		// --- Reset ---
-		new Setting(containerEl).setName("Reset").setHeading();
-
-		new Setting(containerEl)
-			.setName("Reset to defaults")
-			.setDesc("Restore all settings to their default values. The access key is preserved.")
-			.addButton((btn) =>
-				btn
-					.setButtonText("Reset")
-					.setWarning()
-					.onClick(async () => {
-						const apiKey = this.plugin.settings.embeddingApiKey;
-						await this.replaceSettings({
-							...createDefaultSettings(),
-							embeddingApiKey: apiKey,
-						});
-						this.display();
-					})
-			);
+	async setControlValue(key: string, value: unknown): Promise<void> {
+		if (key === "embeddingProvider") {
+			const provider = value as EmbeddingProvider;
+			await this.patchSettings({
+				embeddingProvider: provider,
+				embeddingModel: getDefaultEmbeddingModel(provider),
+			});
+			// Model presets and endpoint/key visibility are structural — re-render.
+			this.update();
+			return;
+		}
+		if (key === "excludeFolders") {
+			await this.patchSettings({
+				excludeFolders: String(value)
+					.split(",")
+					.map((s) => s.trim())
+					.filter((s) => s.length > 0),
+			});
+			return;
+		}
+		await this.patchSettings({ [key]: value } as Partial<PluginSettings>);
 	}
 
 	private async patchSettings(patch: Partial<PluginSettings>): Promise<void> {
@@ -370,20 +322,6 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 		await this.plugin.saveSettings();
 	}
 
-	private addEmbeddingModelOptions(dropdown: import("obsidian").DropdownComponent) {
-		PRESET_EMBEDDING_MODELS[this.plugin.settings.embeddingProvider].forEach((model) => {
-			dropdown.addOption(model, model);
-		});
-		return dropdown;
-	}
-
-	private getSelectedEmbeddingOptionValue(): string {
-		const presets = PRESET_EMBEDDING_MODELS[this.plugin.settings.embeddingProvider];
-		return presets.includes(this.plugin.settings.embeddingModel)
-			? this.plugin.settings.embeddingModel
-			: presets[0];
-	}
-
 	private uploadVectorsJson(): void {
 		const input = activeDocument.createElement("input");
 		input.type = "file";
@@ -397,7 +335,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 				const path = `${this.plugin.manifest.dir}/${UPLOADED_VECTORS_FILE}`;
 				await this.app.vault.adapter.write(path, raw);
 				await this.patchSettings({ uploadedVectorsFileName: file.name });
-				this.display();
+				this.update();
 				new Notice("Uploaded vector file saved.");
 			} catch (error) {
 				new Notice(`Failed to upload vector file: ${error instanceof Error ? error.message : String(error)}`);
