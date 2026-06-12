@@ -94,6 +94,7 @@ export class GraphSceneRenderer {
 	private gridHelper: THREE.GridHelper | null = null;
 	private clusterObjects: THREE.Object3D[] = [];
 	private suggestionObjects: THREE.Line[] = [];
+	private currentSuggestionSegments: SuggestionSegment[] = [];
 	private suggestionsVisible = true;
 	private timeCutoff: number | null = null;
 	private ctimeByPath = new Map<string, number>();
@@ -198,6 +199,12 @@ export class GraphSceneRenderer {
 		if (this.currentClusterRegions.length > 0) {
 			this.setClusterRegions(this.currentClusterRegions);
 		}
+		if (this.currentSuggestionSegments.length > 0) {
+			this.setSuggestionLinks(this.currentSuggestionSegments);
+		}
+		if (this.timeCutoff !== null) {
+			this.setTimeFilter(this.timeCutoff);
+		}
 	}
 
 	resize(width: number, height: number): void {
@@ -241,6 +248,7 @@ export class GraphSceneRenderer {
 
 	setSuggestionLinks(segments: SuggestionSegment[]): void {
 		this.clearSuggestionObjects();
+		this.currentSuggestionSegments = [...segments];
 		if (!this.graph || segments.length === 0) return;
 
 		const scene = this.getGraphScene();
