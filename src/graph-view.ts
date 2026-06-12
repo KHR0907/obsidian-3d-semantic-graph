@@ -6,6 +6,7 @@ import { createClusteredSphereLayout, buildClusterRegions } from "./clustered-sp
 import { InsightsPanel } from "./insights-panel";
 import { SuggestedLink } from "./insights";
 import { SuggestionSegment } from "./graph-scene-renderer";
+import { t } from "./i18n";
 
 export const VIEW_TYPE = "semantic-graph-3d";
 
@@ -15,12 +16,15 @@ const MIN_NODE_DISTANCE = 14;
 const TOOLTIP_DELAY_MS = 150;
 const TIMELINE_RESOLUTION = 1000;
 const TIMELINE_PLAY_DURATION_MS = 15000;
-const CLUSTERS_MODE_TOOLTIPS = {
-	on: "Clusters on",
-	off: "Clusters off",
-	hover: "Clusters hover",
-} as const;
 type ClustersMode = PluginSettings["showClusters"];
+
+function clustersModeTooltip(mode: ClustersMode): string {
+	switch (mode) {
+		case "on": return t("toolbar.clustersOn");
+		case "off": return t("toolbar.clustersOff");
+		default: return t("toolbar.clustersHover");
+	}
+}
 
 export class SemanticGraphView extends ItemView {
 	private settings: PluginSettings;
@@ -63,7 +67,7 @@ export class SemanticGraphView extends ItemView {
 	}
 
 	getViewType(): string { return VIEW_TYPE; }
-	getDisplayText(): string { return "Semantic graph"; }
+	getDisplayText(): string { return t("view.graph.title"); }
 	getIcon(): string { return "network"; }
 
 	async onOpen(): Promise<void> {
@@ -76,32 +80,32 @@ export class SemanticGraphView extends ItemView {
 			cls: "semantic-graph-btn semantic-graph-icon-btn",
 			attr: {
 				type: "button",
-				"aria-label": "Refresh graph",
+				"aria-label": t("toolbar.refreshAria"),
 			},
 		});
 		setIcon(refreshBtn, "refresh-ccw");
-		this.setToolbarTooltip(refreshBtn, "Refresh");
+		this.setToolbarTooltip(refreshBtn, t("toolbar.refresh"));
 		refreshBtn.addEventListener("click", () => void this.loadGraph());
 
 		const resetViewBtn = this.toolbar.createEl("button", {
 			cls: "semantic-graph-btn semantic-graph-icon-btn semantic-graph-icon-pair-btn",
 			attr: {
 				type: "button",
-				"aria-label": "Reset view",
+				"aria-label": t("toolbar.resetViewAria"),
 			},
 		});
 		const resetCameraIcon = resetViewBtn.createSpan({ cls: "semantic-graph-icon-slot" });
 		const resetRotateIcon = resetViewBtn.createSpan({ cls: "semantic-graph-icon-slot" });
 		setIcon(resetCameraIcon, "camera");
 		setIcon(resetRotateIcon, "rotate-ccw");
-		this.setToolbarTooltip(resetViewBtn, "Reset camera view");
+		this.setToolbarTooltip(resetViewBtn, t("toolbar.resetView"));
 		resetViewBtn.addEventListener("click", () => this.renderer?.resetView());
 
 		this.linksToggleBtn = this.toolbar.createEl("button", {
 			cls: "semantic-graph-btn semantic-graph-icon-btn",
 			attr: {
 				type: "button",
-				"aria-label": "Toggle links",
+				"aria-label": t("toolbar.toggleLinks"),
 			},
 		});
 		this.linksToggleBtn.addEventListener("click", () => void this.toggleLinks());
@@ -109,7 +113,7 @@ export class SemanticGraphView extends ItemView {
 			cls: "semantic-graph-btn semantic-graph-icon-btn",
 			attr: {
 				type: "button",
-				"aria-label": "Toggle grid",
+				"aria-label": t("toolbar.toggleGrid"),
 			},
 		});
 		this.gridToggleBtn.addEventListener("click", () => void this.toggleGrid());
@@ -117,7 +121,7 @@ export class SemanticGraphView extends ItemView {
 			cls: "semantic-graph-btn semantic-graph-icon-btn semantic-graph-clusters-btn",
 			attr: {
 				type: "button",
-				"aria-label": "Clusters mode",
+				"aria-label": t("toolbar.clustersAria"),
 			},
 		});
 		this.clustersToggleBtn.addEventListener("click", () => void this.toggleClusters());
@@ -125,31 +129,31 @@ export class SemanticGraphView extends ItemView {
 			cls: "semantic-graph-btn semantic-graph-icon-btn",
 			attr: {
 				type: "button",
-				"aria-label": "Toggle insights",
+				"aria-label": t("toolbar.insightsAria"),
 			},
 		});
 		setIcon(this.insightsBtn, "lightbulb");
-		this.setToolbarTooltip(this.insightsBtn, "Insights");
+		this.setToolbarTooltip(this.insightsBtn, t("toolbar.insights"));
 		this.insightsBtn.addEventListener("click", () => this.insightsPanel?.toggle());
 		this.timelineBtn = this.toolbar.createEl("button", {
 			cls: "semantic-graph-btn semantic-graph-icon-btn",
 			attr: {
 				type: "button",
-				"aria-label": "Toggle timeline",
+				"aria-label": t("toolbar.timelineAria"),
 			},
 		});
 		setIcon(this.timelineBtn, "history");
-		this.setToolbarTooltip(this.timelineBtn, "Timeline");
+		this.setToolbarTooltip(this.timelineBtn, t("toolbar.timeline"));
 		this.timelineBtn.addEventListener("click", () => this.toggleTimeline());
 		const exportBtn = this.toolbar.createEl("button", {
 			cls: "semantic-graph-btn semantic-graph-icon-btn",
 			attr: {
 				type: "button",
-				"aria-label": "Export interactive HTML",
+				"aria-label": t("toolbar.exportAria"),
 			},
 		});
 		setIcon(exportBtn, "download");
-		this.setToolbarTooltip(exportBtn, "Export HTML");
+		this.setToolbarTooltip(exportBtn, t("toolbar.export"));
 		exportBtn.addEventListener("click", () => void this.exportGraphHtml());
 		this.updateLinksToggleButton();
 		this.updateGridToggleButton();
@@ -173,7 +177,7 @@ export class SemanticGraphView extends ItemView {
 			cls: "semantic-graph-btn semantic-graph-icon-btn",
 			attr: {
 				type: "button",
-				"aria-label": "Play timeline",
+				"aria-label": t("timeline.play"),
 			},
 		});
 		setIcon(this.timelinePlayBtn, "play");
@@ -249,7 +253,7 @@ export class SemanticGraphView extends ItemView {
 
 		this.linksToggleBtn.empty();
 		setIcon(this.linksToggleBtn, "link");
-		const linksLabel = this.settings.showLinks ? "Links on" : "Links off";
+		const linksLabel = this.settings.showLinks ? t("toolbar.linksOn") : t("toolbar.linksOff");
 		this.setToolbarTooltip(this.linksToggleBtn, linksLabel);
 		this.linksToggleBtn.setAttribute("aria-label", linksLabel);
 		this.linksToggleBtn.setAttribute("aria-pressed", String(this.settings.showLinks));
@@ -261,7 +265,7 @@ export class SemanticGraphView extends ItemView {
 
 		this.gridToggleBtn.empty();
 		setIcon(this.gridToggleBtn, "layout-grid");
-		const gridLabel = this.settings.showGrid ? "Grid on" : "Grid off";
+		const gridLabel = this.settings.showGrid ? t("toolbar.gridOn") : t("toolbar.gridOff");
 		this.setToolbarTooltip(this.gridToggleBtn, gridLabel);
 		this.gridToggleBtn.setAttribute("aria-label", gridLabel);
 		this.gridToggleBtn.setAttribute("aria-pressed", String(this.settings.showGrid));
@@ -301,8 +305,8 @@ export class SemanticGraphView extends ItemView {
 		const mode = this.getClustersMode();
 		this.clustersToggleBtn.empty();
 		setIcon(this.clustersToggleBtn, "layers");
-		this.setToolbarTooltip(this.clustersToggleBtn, CLUSTERS_MODE_TOOLTIPS[mode]);
-		this.clustersToggleBtn.setAttribute("aria-label", CLUSTERS_MODE_TOOLTIPS[mode]);
+		this.setToolbarTooltip(this.clustersToggleBtn, clustersModeTooltip(mode));
+		this.clustersToggleBtn.setAttribute("aria-label", clustersModeTooltip(mode));
 		this.clustersToggleBtn.classList.toggle("is-active", mode === "on");
 		this.clustersToggleBtn.classList.toggle("is-hover", mode === "hover");
 		this.clustersToggleBtn.classList.toggle("is-off", mode === "off");
@@ -335,7 +339,7 @@ export class SemanticGraphView extends ItemView {
 
 	private async exportGraphHtml(): Promise<void> {
 		if (!this.lastGraphData || this.lastGraphData.nodes.length === 0) {
-			new Notice("Load the graph before exporting.");
+			new Notice(t("export.loadFirst"));
 			return;
 		}
 
@@ -353,9 +357,9 @@ export class SemanticGraphView extends ItemView {
 			anchor.download = "semantic-graph.html";
 			anchor.click();
 			URL.revokeObjectURL(url);
-			new Notice("Graph exported as semantic-graph.html");
+			new Notice(t("export.done"));
 		} catch (error) {
-			new Notice(`Failed to export graph: ${error instanceof Error ? error.message : String(error)}`);
+			new Notice(t("export.failed", { message: error instanceof Error ? error.message : String(error) }));
 		}
 	}
 
@@ -392,13 +396,13 @@ export class SemanticGraphView extends ItemView {
 		const range = this.getTimelineRange();
 		if (!range) {
 			this.renderer.setTimeFilter(null);
-			this.timelineLabel?.setText("No creation dates available");
+			this.timelineLabel?.setText(t("timeline.noDates"));
 			return;
 		}
 
-		const t = Number(this.timelineSlider.value) / TIMELINE_RESOLUTION;
-		const cutoff = range.min + (range.max - range.min) * t;
-		this.renderer.setTimeFilter(t >= 1 ? null : cutoff);
+		const progress = Number(this.timelineSlider.value) / TIMELINE_RESOLUTION;
+		const cutoff = range.min + (range.max - range.min) * progress;
+		this.renderer.setTimeFilter(progress >= 1 ? null : cutoff);
 		this.timelineLabel?.setText(new Date(cutoff).toLocaleDateString());
 	}
 
@@ -475,15 +479,15 @@ export class SemanticGraphView extends ItemView {
 
 	private async reduceEmbeddings(vectors: number[][], settings: PluginSettings): Promise<number[][]> {
 		if (settings.projectionMethod === "pca") {
-			this.setStatus("Running PCA...");
+			this.setStatus(t("status.pca"));
 			const { PcaReducer } = await import("./pca-reducer");
 			const reducer = new PcaReducer();
 			return reducer.reduce(vectors, (step, total) => {
-				this.setStatus(`PCA: ${step}/${total}`);
+				this.setStatus(t("status.pcaProgress", { step, total }));
 			});
 		}
 
-		this.setStatus("Running UMAP...");
+		this.setStatus(t("status.umap"));
 		const { UmapReducer } = await import("./umap-reducer");
 		const reducer = new UmapReducer({
 			nNeighbors: settings.umapNNeighbors,
@@ -491,7 +495,7 @@ export class SemanticGraphView extends ItemView {
 			seed: settings.layoutSeed,
 		});
 		return reducer.reduce(vectors, (epoch, total) => {
-			this.setStatus(`UMAP: ${epoch}/${total}`);
+			this.setStatus(t("status.umapProgress", { epoch, total }));
 		});
 	}
 
@@ -503,13 +507,13 @@ export class SemanticGraphView extends ItemView {
 		const isCurrentRequest = () => requestId === this.loadRequestId;
 
 		try {
-			this.setStatus("Building graph...");
+			this.setStatus(t("status.building"));
 			const graphData = buildGraphData(this.app, settings);
 			const layoutRadius = this.getLayoutRadius();
 
 			if (graphData.nodes.length === 0) {
 				if (isCurrentRequest()) {
-					this.showError("No markdown files found in vault.");
+					this.showError(t("error.noFiles"));
 				}
 				return;
 			}
@@ -543,7 +547,7 @@ export class SemanticGraphView extends ItemView {
 								layoutRadius
 							);
 					} else {
-						this.setStatus("Using clustered sphere layout...");
+						this.setStatus(t("status.clusteredSphere"));
 						clusterResult = createClusteredSphereLayout(
 							graphData.nodes, layoutRadius, settings.layoutSeed
 						);
@@ -552,14 +556,14 @@ export class SemanticGraphView extends ItemView {
 				} catch (embErr: unknown) {
 					if (!isCurrentRequest()) return;
 					console.warn("Embedding step failed:", embErr instanceof Error ? embErr.message : String(embErr));
-					this.setStatus("Embedding failed, using clustered sphere layout...");
+					this.setStatus(t("status.embeddingFailed"));
 					clusterResult = createClusteredSphereLayout(
 						graphData.nodes, layoutRadius, settings.layoutSeed
 					);
 					finalPositions = clusterResult.positions;
 				}
 			} else {
-				this.setStatus("Using clustered sphere layout...");
+				this.setStatus(t("status.clusteredSphere"));
 				clusterResult = createClusteredSphereLayout(
 					graphData.nodes, layoutRadius, settings.layoutSeed
 				);
@@ -581,7 +585,7 @@ export class SemanticGraphView extends ItemView {
 			);
 			this.applyPositions(graphData.nodes, finalPositions);
 
-			this.setStatus(`${graphData.nodes.length} notes, ${graphData.links.length} links`);
+			this.setStatus(t("status.summary", { notes: graphData.nodes.length, links: graphData.links.length }));
 			if (!isCurrentRequest()) return;
 
 			this.renderer?.dispose();
@@ -617,22 +621,22 @@ export class SemanticGraphView extends ItemView {
 			if (!isCurrentRequest()) return;
 			console.error("Semantic Graph error:", err);
 			const msg = err instanceof Error ? err.message : String(err);
-			this.showError(`Error: ${msg}`);
-			new Notice(`Semantic graph: ${msg}`);
+			this.showError(t("error.generic", { message: msg }));
+			new Notice(t("notice.graphError", { message: msg }));
 		}
 	}
 
 	private async loadProviderEmbeddings(settings: PluginSettings): Promise<Map<string, number[]>> {
-		this.setStatus("Generating embeddings...");
+		this.setStatus(t("status.embedding"));
 		const { EmbeddingService } = await import("./embedding");
 		const embeddingService = new EmbeddingService(this.app, settings, this.pluginDir);
 		return embeddingService.getEmbeddings((current, total) => {
-			this.setStatus(`Embedding... ${current}/${total}`);
+			this.setStatus(t("status.embeddingProgress", { current, total }));
 		});
 	}
 
 	private async loadUploadedEmbeddingVectors(): Promise<Map<string, number[]>> {
-		this.setStatus("Loading uploaded vectors...");
+		this.setStatus(t("status.loadingVectors"));
 		const { readUploadedVectors } = await import("./uploaded-vectors");
 		return readUploadedVectors(this.app, this.pluginDir);
 	}

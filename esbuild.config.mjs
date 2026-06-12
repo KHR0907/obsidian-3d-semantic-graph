@@ -24,6 +24,12 @@ esbuild
 		],
 		format: "cjs",
 		target: "es2018",
+		alias: {
+			// Unused optional force engine; its runtime codegen (new Function)
+			// would otherwise be flagged by the plugin review. See src/stubs/.
+			"ngraph.graph": "./src/stubs/ngraph-stub.js",
+			"ngraph.forcelayout": "./src/stubs/ngraph-stub.js",
+		},
 		logLevel: "info",
 		sourcemap: prod ? false : "inline",
 		treeShaking: true,

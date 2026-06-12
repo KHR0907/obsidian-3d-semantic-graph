@@ -8,12 +8,14 @@ import {
 import { SemanticGraphSettingTab } from "./settings";
 import { SemanticGraphView, VIEW_TYPE } from "./graph-view";
 import { NeighborsView, NEIGHBORS_VIEW_TYPE } from "./neighbors-view";
+import { applyLanguageSetting, t } from "./i18n";
 
 export default class SemanticGraphPlugin extends Plugin {
 	settings: PluginSettings = createDefaultSettings();
 
 	async onload() {
 		await this.loadSettings();
+		applyLanguageSetting(this.settings.language);
 
 		this.registerView(VIEW_TYPE, (leaf: WorkspaceLeaf) => {
 			return new SemanticGraphView(
@@ -37,13 +39,13 @@ export default class SemanticGraphPlugin extends Plugin {
 			);
 		});
 
-		this.addRibbonIcon("network", "Semantic graph", () => {
+		this.addRibbonIcon("network", t("view.graph.title"), () => {
 			void this.activateView();
 		});
 
 		this.addCommand({
 			id: "open-semantic-graph",
-			name: "Open graph view",
+			name: t("command.openGraph"),
 			callback: () => {
 				void this.activateView();
 			},
@@ -51,7 +53,7 @@ export default class SemanticGraphPlugin extends Plugin {
 
 		this.addCommand({
 			id: "open-semantic-neighbors",
-			name: "Open semantic neighbors",
+			name: t("command.openNeighbors"),
 			callback: () => {
 				void this.activateNeighborsView();
 			},
@@ -86,6 +88,10 @@ export default class SemanticGraphPlugin extends Plugin {
 			this.settings.sceneTheme = "auto";
 		}
 
+		if (!["auto", "en", "ko"].includes(this.settings.language)) {
+			this.settings.language = "auto";
+		}
+
 		// Clean up legacy fields
 		const s = this.settings as unknown as Record<string, unknown>;
 		delete s.nodeAssetMode;
@@ -100,6 +106,7 @@ export default class SemanticGraphPlugin extends Plugin {
 		const nextSettings = clonePluginSettings(this.settings);
 		this.settings = nextSettings;
 		await this.saveData(nextSettings);
+		applyLanguageSetting(nextSettings.language);
 		// Update existing views with new settings
 		this.app.workspace.getLeavesOfType(VIEW_TYPE).forEach((leaf) => {
 			if (leaf.view instanceof SemanticGraphView) {

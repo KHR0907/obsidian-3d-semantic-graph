@@ -1,6 +1,7 @@
 import { ItemView, TFile, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
 import { computeNeighbors, NeighborEntry } from "./insights";
 import { GraphData, GraphNode, GraphVisualOptions, PluginSettings } from "./types";
+import { t } from "./i18n";
 
 export const NEIGHBORS_VIEW_TYPE = "semantic-graph-neighbors";
 
@@ -34,7 +35,7 @@ export class NeighborsView extends ItemView {
 	}
 
 	getViewType(): string { return NEIGHBORS_VIEW_TYPE; }
-	getDisplayText(): string { return "Semantic neighbors"; }
+	getDisplayText(): string { return t("view.neighbors.title"); }
 	getIcon(): string { return "orbit"; }
 
 	async onOpen(): Promise<void> {
@@ -43,13 +44,13 @@ export class NeighborsView extends ItemView {
 		container.addClass("semantic-neighbors-container");
 
 		const header = container.createDiv({ cls: "semantic-neighbors-header" });
-		header.createSpan({ cls: "semantic-neighbors-title", text: "Semantic neighbors" });
+		header.createSpan({ cls: "semantic-neighbors-title", text: t("view.neighbors.title") });
 		const reloadBtn = header.createEl("button", {
 			cls: "semantic-graph-btn semantic-graph-icon-btn",
-			attr: { type: "button", "aria-label": "Reload vectors" },
+			attr: { type: "button", "aria-label": t("neighbors.reload") },
 		});
 		setIcon(reloadBtn, "refresh-ccw");
-		setTooltip(reloadBtn, "Reload vectors", { delay: 150 });
+		setTooltip(reloadBtn, t("neighbors.reload"), { delay: 150 });
 		reloadBtn.addEventListener("click", () => {
 			this.vectors = null;
 			this.renderedPath = null;
@@ -101,24 +102,24 @@ export class NeighborsView extends ItemView {
 
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile || activeFile.extension !== "md") {
-			this.showHint("Open a note to see its semantic neighbors.");
+			this.showHint(t("neighbors.openNote"));
 			return;
 		}
 		if (activeFile.path === this.renderedPath) return;
 
 		const vectors = await this.loadVectors();
 		if (!vectors || vectors.size < 2) {
-			this.showHint("No embeddings available. Open the graph view with an embedding provider configured to generate them.");
+			this.showHint(t("neighbors.noVectors"));
 			return;
 		}
 		if (!vectors.has(activeFile.path)) {
-			this.showHint("No embedding for this note yet. Refresh the graph view to embed new notes.");
+			this.showHint(t("neighbors.noVectorForNote"));
 			return;
 		}
 
 		const neighbors = computeNeighbors(vectors, activeFile.path, this.settings.neighborCount);
 		if (neighbors.length === 0) {
-			this.showHint("No neighbors found.");
+			this.showHint(t("neighbors.none"));
 			return;
 		}
 

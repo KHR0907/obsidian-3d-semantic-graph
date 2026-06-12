@@ -9,6 +9,7 @@ import {
 } from "obsidian";
 import SemanticGraphPlugin from "./main";
 import { EmbeddingService } from "./embedding";
+import { t } from "./i18n";
 import {
 	clonePluginSettings,
 	createDefaultSettings,
@@ -36,11 +37,30 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 		return [
 			{
 				type: "group",
-				heading: "Embeddings",
+				heading: t("settings.general.heading"),
 				items: [
 					{
-						name: "Embedding provider",
-						desc: "OpenAI requires an access key. Ollama runs locally without a key.",
+						name: t("settings.language.name"),
+						desc: t("settings.language.desc"),
+						control: {
+							type: "dropdown",
+							key: "language",
+							options: {
+								auto: t("settings.language.auto"),
+								en: "English",
+								ko: "한국어",
+							},
+						},
+					},
+				],
+			},
+			{
+				type: "group",
+				heading: t("settings.embeddings.heading"),
+				items: [
+					{
+						name: t("settings.provider.name"),
+						desc: t("settings.provider.desc"),
 						control: {
 							type: "dropdown",
 							key: "embeddingProvider",
@@ -48,8 +68,8 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 						},
 					},
 					{
-						name: "Ollama endpoint",
-						desc: "Base URL of the local Ollama server. Default: http://localhost:11434.",
+						name: t("settings.ollamaEndpoint.name"),
+						desc: t("settings.ollamaEndpoint.desc"),
 						visible: () => this.plugin.settings.embeddingProvider === "ollama",
 						control: {
 							type: "text",
@@ -58,15 +78,15 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 						},
 					},
 					{
-						name: "Access key",
-						desc: "Access key for generating embeddings. Leave blank to use the sphere layout without semantic positioning.",
+						name: t("settings.accessKey.name"),
+						desc: t("settings.accessKey.desc"),
 						visible: () => this.plugin.settings.embeddingProvider !== "ollama",
 						render: (setting: Setting) => {
 							setting.addText((text) =>
 								text
-									.setPlaceholder("Paste your access key")
+									.setPlaceholder(t("settings.accessKey.placeholder"))
 									.setValue(this.plugin.settings.embeddingApiKey)
-									.then((t) => (t.inputEl.type = "password"))
+									.then((input) => (input.inputEl.type = "password"))
 									.onChange(async (value) => {
 										await this.patchSettings({ embeddingApiKey: value.trim() });
 									})
@@ -74,11 +94,11 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 						},
 					},
 					{
-						name: "Embedding model",
+						name: t("settings.model.name"),
 						desc:
 							settings.embeddingProvider === "ollama"
-								? "Choose which model to use for embeddings. Pull it first with `ollama pull <model>`."
-								: "Choose which model to use for embeddings.",
+								? t("settings.model.descOllama")
+								: t("settings.model.desc"),
 						control: {
 							type: "dropdown",
 							key: "embeddingModel",
@@ -88,31 +108,35 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 						},
 					},
 					{
-						name: "Vector file",
-						desc: "Use an uploaded vector file instead of generated embeddings.",
+						name: t("settings.vectorFile.name"),
+						desc: t("settings.vectorFile.desc"),
 						render: (setting: Setting) => {
 							setting
 								.addButton((button) =>
 									button
-										.setButtonText("Export")
-										.setTooltip("Download vectors as a compatible file")
+										.setButtonText(t("settings.vectorFile.export"))
+										.setTooltip(t("settings.vectorFile.exportTooltip"))
 										.onClick(() => void this.exportVectorsJson())
 								)
 								.addButton((button) =>
 									button
-										.setButtonText(this.plugin.settings.uploadedVectorsFileName ? "Upload again" : "Upload")
+										.setButtonText(
+											this.plugin.settings.uploadedVectorsFileName
+												? t("settings.vectorFile.uploadAgain")
+												: t("settings.vectorFile.upload")
+										)
 										.onClick(() => void this.uploadVectorsJson())
 								)
 								.addText((text) =>
 									text
-										.setPlaceholder("Uploaded file name")
+										.setPlaceholder(t("settings.vectorFile.placeholder"))
 										.setValue(this.plugin.settings.uploadedVectorsFileName)
 										.setDisabled(true)
 								)
 								.addExtraButton((button) =>
 									button
 										.setIcon("cross")
-										.setTooltip("Clear uploaded vectors reference")
+										.setTooltip(t("settings.vectorFile.clearTooltip"))
 										.onClick(async () => {
 											await this.patchSettings({ uploadedVectorsFileName: "" });
 											this.update();
@@ -124,33 +148,39 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			},
 			{
 				type: "group",
-				heading: "Graph",
+				heading: t("settings.graph.heading"),
 				items: [
 					{
-						name: "Node color by",
-						desc: "How to assign colors to nodes. Default: folder.",
+						name: t("settings.nodeColorBy.name"),
+						desc: t("settings.nodeColorBy.desc"),
 						control: {
 							type: "dropdown",
 							key: "nodeColorBy",
-							options: { folder: "Folder", tag: "First tag" },
+							options: {
+								folder: t("settings.nodeColorBy.folder"),
+								tag: t("settings.nodeColorBy.tag"),
+							},
 						},
 					},
 					{
-						name: "Projection method",
-						desc: "Choose how embeddings are projected into space. Default: mapped layout.",
+						name: t("settings.projection.name"),
+						desc: t("settings.projection.desc"),
 						control: {
 							type: "dropdown",
 							key: "projectionMethod",
-							options: { umap: "Mapped layout", pca: "Principal components" },
+							options: {
+								umap: t("settings.projection.umap"),
+								pca: t("settings.projection.pca"),
+							},
 						},
 					},
 					{
-						name: "Layout seed",
-						desc: "Seed used for layout steps and overlap resolution. Using the same seed makes the layout more repeatable. Default: random.",
+						name: t("settings.layoutSeed.name"),
+						desc: t("settings.layoutSeed.desc"),
 						render: (setting: Setting) => {
 							setting
 								.addButton((button) =>
-									button.setButtonText("Random").onClick(async () => {
+									button.setButtonText(t("settings.layoutSeed.random")).onClick(async () => {
 										await this.patchSettings({ layoutSeed: generateRandomLayoutSeed() });
 										this.update();
 									})
@@ -159,7 +189,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 									text
 										.setPlaceholder("12345")
 										.setValue(String(this.plugin.settings.layoutSeed))
-										.then((t) => (t.inputEl.type = "number"))
+										.then((input) => (input.inputEl.type = "number"))
 										.onChange(async (value) => {
 											const parsed = Number.parseInt(value, 10);
 											await this.patchSettings({
@@ -170,63 +200,67 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 						},
 					},
 					{
-						name: "Show links",
-						desc: "Display connection lines between nodes. Default: off.",
+						name: t("settings.showLinks.name"),
+						desc: t("settings.showLinks.desc"),
 						control: { type: "toggle", key: "showLinks" },
 					},
 					{
-						name: "Show grid",
-						desc: "Display a solid square grid on the ground plane. Default: on.",
+						name: t("settings.showGrid.name"),
+						desc: t("settings.showGrid.desc"),
 						control: { type: "toggle", key: "showGrid" },
 					},
 				],
 			},
 			{
 				type: "group",
-				heading: "Appearance",
+				heading: t("settings.appearance.heading"),
 				items: [
 					{
-						name: "Scene theme",
-						desc: "Choose the background style for the scene. Auto follows the app theme. Default: auto.",
+						name: t("settings.sceneTheme.name"),
+						desc: t("settings.sceneTheme.desc"),
 						control: {
 							type: "dropdown",
 							key: "sceneTheme",
-							options: { auto: "Auto", dark: "Dark", light: "Light" },
+							options: {
+								auto: t("settings.sceneTheme.auto"),
+								dark: t("settings.sceneTheme.dark"),
+								light: t("settings.sceneTheme.light"),
+							},
 						},
 					},
 					{
-						name: "Node opacity",
-						desc: "Adjust node transparency. Default: 1.0.",
+						name: t("settings.nodeOpacity.name"),
+						desc: t("settings.nodeOpacity.desc"),
 						control: { type: "slider", key: "nodeOpacity", min: 0.15, max: 1, step: 0.05 },
 					},
 					{
-						name: "Node size",
-						desc: "Adjust the size of nodes. Default: 1.5.",
+						name: t("settings.nodeSize.name"),
+						desc: t("settings.nodeSize.desc"),
 						control: { type: "slider", key: "nodeSizeScale", min: 0.4, max: 2, step: 0.05 },
 					},
 					{
-						name: "Drag sensitivity",
-						desc: "Adjust how strongly the camera responds when dragging the graph. Default: 1.0.",
+						name: t("settings.dragSensitivity.name"),
+						desc: t("settings.dragSensitivity.desc"),
 						control: { type: "slider", key: "dragSensitivity", min: 0.2, max: 3, step: 0.1 },
 					},
 					{
-						name: "Auto orbit speed",
-						desc: "Adjust the idle camera orbit speed. Set to 0 to disable automatic camera movement. Default: 0.2.",
+						name: t("settings.autoOrbit.name"),
+						desc: t("settings.autoOrbit.desc"),
 						control: { type: "slider", key: "autoOrbitSpeed", min: 0, max: 3, step: 0.1 },
 					},
 					{
-						name: "Suggested links",
-						desc: "Maximum number of suggested links shown in the insights panel. Default: 20.",
+						name: t("settings.suggestedLinks.name"),
+						desc: t("settings.suggestedLinks.desc"),
 						control: { type: "slider", key: "suggestedLinkCount", min: 5, max: 100, step: 5 },
 					},
 					{
-						name: "Neighbor count",
-						desc: "Number of notes shown in the semantic neighbors sidebar. Default: 10.",
+						name: t("settings.neighborCount.name"),
+						desc: t("settings.neighborCount.desc"),
 						control: { type: "slider", key: "neighborCount", min: 3, max: 30, step: 1 },
 					},
 					{
-						name: "Exclude folders",
-						desc: "Comma-separated list of folders to exclude from the graph.",
+						name: t("settings.excludeFolders.name"),
+						desc: t("settings.excludeFolders.desc"),
 						control: {
 							type: "text",
 							key: "excludeFolders",
@@ -237,31 +271,31 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			},
 			{
 				type: "group",
-				heading: "Projection tuning",
+				heading: t("settings.tuning.heading"),
 				items: [
 					{
-						name: "Number of neighbors",
-						desc: "Controls local vs global structure (5-50). Lower = tighter clusters, higher = broader spread. Default: 30.",
+						name: t("settings.umapNeighbors.name"),
+						desc: t("settings.umapNeighbors.desc"),
 						control: { type: "slider", key: "umapNNeighbors", min: 5, max: 50, step: 1 },
 					},
 					{
-						name: "Minimum distance",
-						desc: "How tightly similar points are packed (0.0-0.99). Lower values create tighter clusters. Default: 0.80.",
+						name: t("settings.umapMinDist.name"),
+						desc: t("settings.umapMinDist.desc"),
 						control: { type: "slider", key: "umapMinDist", min: 0, max: 0.99, step: 0.01 },
 					},
 				],
 			},
 			{
 				type: "group",
-				heading: "Reset",
+				heading: t("settings.reset.heading"),
 				items: [
 					{
-						name: "Reset to defaults",
-						desc: "Restore all settings to their default values. The access key is preserved.",
+						name: t("settings.reset.name"),
+						desc: t("settings.reset.desc"),
 						render: (setting: Setting) => {
 							setting.addButton((button) =>
 								button
-									.setButtonText("Reset")
+									.setButtonText(t("settings.reset.button"))
 									.setDestructive()
 									.onClick(async () => {
 										const apiKey = this.plugin.settings.embeddingApiKey;
@@ -287,6 +321,12 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 	}
 
 	async setControlValue(key: string, value: unknown): Promise<void> {
+		if (key === "language") {
+			await this.patchSettings({ language: value as PluginSettings["language"] });
+			// saveSettings re-applies the locale; re-render so the tab itself switches language.
+			this.update();
+			return;
+		}
 		if (key === "embeddingProvider") {
 			const provider = value as EmbeddingProvider;
 			await this.patchSettings({
@@ -336,9 +376,9 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 				await this.app.vault.adapter.write(path, raw);
 				await this.patchSettings({ uploadedVectorsFileName: file.name });
 				this.update();
-				new Notice("Uploaded vector file saved.");
+				new Notice(t("notice.vectorsUploaded"));
 			} catch (error) {
-				new Notice(`Failed to upload vector file: ${error instanceof Error ? error.message : String(error)}`);
+				new Notice(t("notice.vectorsUploadFailed", { message: errorMessage(error) }));
 			}
 		};
 		input.click();
@@ -355,31 +395,31 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			if (await adapter.exists(uploadedPath)) {
 				raw = await adapter.read(uploadedPath);
 				fileName = this.plugin.settings.uploadedVectorsFileName || UPLOADED_VECTORS_FILE;
-				noticeMessage = "Uploaded vector file exported.";
+				noticeMessage = t("notice.vectorsExported.uploaded");
 			} else {
 				const s = this.plugin.settings;
 				const canGenerate = s.embeddingProvider === "ollama"
 					? Boolean(s.ollamaEndpoint.trim())
 					: Boolean(s.embeddingApiKey.trim());
 				if (canGenerate) {
-					new Notice("Generating vector file...");
+					new Notice(t("notice.vectorsGenerating"));
 					const service = new EmbeddingService(this.app, this.plugin.settings, this.plugin.manifest.dir!);
 					const embeddings = await service.getEmbeddings();
 					raw = serializeUploadedVectors(embeddings.entries());
 					fileName = "exported-vectors.json";
-					noticeMessage = "Generated vector file exported.";
+					noticeMessage = t("notice.vectorsExported.generated");
 				} else {
 					raw = this.getUploadedVectorsTemplateJson();
 					fileName = "vectors-template.json";
-					noticeMessage = "Template vector file exported.";
+					noticeMessage = t("notice.vectorsExported.template");
 				}
 			}
 
 			this.downloadJsonFile(fileName, raw);
 			const vaultPath = await this.writeVectorsPreviewFile(fileName, raw);
-			new Notice(`${noticeMessage} Created ${vaultPath} in the vault.`);
+			new Notice(t("notice.vectorsExported.createdInVault", { message: noticeMessage, path: vaultPath }));
 		} catch (error) {
-			new Notice(`Failed to export vector file: ${error instanceof Error ? error.message : String(error)}`);
+			new Notice(t("notice.vectorsExportFailed", { message: errorMessage(error) }));
 		}
 	}
 
@@ -416,4 +456,8 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 		await this.app.vault.create(vaultPath, raw);
 		return vaultPath;
 	}
+}
+
+function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }

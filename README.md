@@ -12,6 +12,7 @@ Desktop-only Obsidian plugin that visualizes your notes in an interactive 3D spa
 - **Semantic neighbors sidebar** — a mini 3D view plus ranked list of the active note's nearest semantic neighbors
 - **Timeline playback** — replay your vault's growth over time by note creation date (frontmatter `created` / `date created` when present, file ctime otherwise)
 - **Interactive HTML export** — download the current graph as a standalone HTML file with deep links back into your vault
+- **Korean and English UI** — language setting (auto / English / 한국어); auto follows the Obsidian app language
 - **Clustered sphere fallback** — folder-based clustered layout with color-coded groups when no embeddings are available
 - **ConvexHull cluster regions** — translucent 3D hulls that outline folder clusters (toggle: On / Hover / Off)
 - **Note links** — real links from Obsidian's resolved references, togglable from the toolbar
@@ -36,6 +37,12 @@ Desktop-only Obsidian plugin that visualizes your notes in an interactive 3D spa
 3. Open the graph — embeddings are generated locally and cached.
 
 ## Installation
+
+Requires Obsidian **1.13.0 or newer** (desktop only).
+
+### Community plugins
+
+Search for **3D Semantic Graph** in **Settings → Community plugins** and install.
 
 ### Build from source
 
@@ -81,6 +88,7 @@ npm run build  # production build
 
 | Setting | Description | Default |
 | --- | --- | --- |
+| Language | Plugin UI language (auto / English / 한국어) | `auto` |
 | Embedding Provider | OpenAI (API key) or Ollama (local) | `openai` |
 | API Key | OpenAI API key for embedding generation | Empty |
 | Ollama Endpoint | Base URL of the local Ollama server | `http://localhost:11434` |

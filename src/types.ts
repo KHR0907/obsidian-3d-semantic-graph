@@ -8,6 +8,7 @@ export const GRAPH_GROUP_COLORS: readonly string[] = [
 ];
 
 export interface PluginSettings {
+	language: "auto" | "en" | "ko";
 	embeddingProvider: EmbeddingProvider;
 	embeddingApiKey: string;
 	embeddingModel: string;
@@ -37,6 +38,7 @@ export function generateRandomLayoutSeed(): number {
 
 export function createDefaultSettings(): PluginSettings {
 	return {
+		language: "auto",
 		embeddingProvider: "openai",
 		embeddingApiKey: "",
 		embeddingModel: "text-embedding-3-large",

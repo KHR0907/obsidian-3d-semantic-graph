@@ -1,4 +1,5 @@
 import { GraphData, getNodePath } from "./types";
+import { t } from "./i18n";
 
 export interface GraphExportOptions {
 	vaultName: string;
@@ -87,8 +88,8 @@ export function buildGraphExportHtml(data: GraphData, options: GraphExportOption
 <body>
 <div id="info">
 	<strong>${escapeHtml(options.vaultName)}</strong><br>
-	${nodes.length} notes · ${links.length} links · exported ${exportedAt}<br>
-	Click a node to open it in Obsidian
+	${escapeHtml(t("export.stats", { notes: nodes.length, links: links.length, date: exportedAt }))}<br>
+	${escapeHtml(t("export.clickHint"))}
 </div>
 <div id="graph"></div>
 <script src="${FORCE_GRAPH_CDN}"></script>

@@ -8,6 +8,7 @@ import {
 	computePairInsights,
 } from "./insights";
 import { GraphData } from "./types";
+import { t } from "./i18n";
 
 export interface InsightsPanelData {
 	graphData: GraphData;
@@ -47,10 +48,10 @@ export class InsightsPanel {
 		this.rootEl.hide();
 
 		const header = this.rootEl.createDiv({ cls: "semantic-graph-insights-header" });
-		header.createSpan({ text: "Insights" });
+		header.createSpan({ text: t("insights.title") });
 		const closeBtn = header.createEl("button", {
 			cls: "semantic-graph-btn semantic-graph-icon-btn",
-			attr: { type: "button", "aria-label": "Close insights" },
+			attr: { type: "button", "aria-label": t("insights.closeAria") },
 		});
 		setIcon(closeBtn, "x");
 		closeBtn.addEventListener("click", () => this.hide());
@@ -100,7 +101,7 @@ export class InsightsPanel {
 	private computeAndRender(): void {
 		if (!this.data) {
 			this.bodyEl.empty();
-			this.bodyEl.createDiv({ cls: "semantic-graph-insights-hint", text: "Load the graph first." });
+			this.bodyEl.createDiv({ cls: "semantic-graph-insights-hint", text: t("insights.loadFirst") });
 			return;
 		}
 
@@ -126,7 +127,7 @@ export class InsightsPanel {
 				onProgress: (done, total) => {
 					if (requestId === this.computeRequestId && total > 0) {
 						this.computingStatusEl?.setText(
-							`Computing insights… ${Math.round((done / total) * 100)}%`
+							t("insights.computing", { percent: Math.round((done / total) * 100) })
 						);
 					}
 				},
@@ -149,7 +150,7 @@ export class InsightsPanel {
 		this.bodyEl.empty();
 		this.computingStatusEl = this.bodyEl.createDiv({
 			cls: "semantic-graph-insights-hint",
-			text: "Computing insights… 0%",
+			text: t("insights.computing", { percent: 0 }),
 		});
 	}
 
@@ -163,21 +164,21 @@ export class InsightsPanel {
 
 		// --- Suggested links ---
 		const suggestionsSection = this.createSection(
-			"Suggested links",
-			"Semantically close notes that are not linked yet."
+			t("insights.suggested.title"),
+			t("insights.suggested.desc")
 		);
 		if (!embeddings) {
 			suggestionsSection.createDiv({
 				cls: "semantic-graph-insights-hint",
-				text: "Requires embeddings. Configure a provider or upload vectors, then refresh the graph.",
+				text: t("insights.requiresEmbeddings"),
 			});
 		} else if (tooManyNotes) {
 			suggestionsSection.createDiv({
 				cls: "semantic-graph-insights-hint",
-				text: `Skipped: more than ${MAX_PAIRWISE_NODES} notes.`,
+				text: t("insights.skippedTooMany", { max: MAX_PAIRWISE_NODES }),
 			});
 		} else if (suggestions.length === 0) {
-			suggestionsSection.createDiv({ cls: "semantic-graph-insights-hint", text: "No suggestions." });
+			suggestionsSection.createDiv({ cls: "semantic-graph-insights-hint", text: t("insights.noSuggestions") });
 		} else {
 			for (const suggestion of suggestions) {
 				this.renderSuggestionRow(suggestionsSection, suggestion);
@@ -186,13 +187,13 @@ export class InsightsPanel {
 
 		// --- Duplicates ---
 		const duplicatesSection = this.createSection(
-			"Potential duplicates",
-			"Note pairs with near-identical content."
+			t("insights.duplicates.title"),
+			t("insights.duplicates.desc")
 		);
 		if (!embeddings || tooManyNotes) {
-			duplicatesSection.createDiv({ cls: "semantic-graph-insights-hint", text: "Requires embeddings." });
+			duplicatesSection.createDiv({ cls: "semantic-graph-insights-hint", text: t("insights.requiresEmbeddingsShort") });
 		} else if (duplicates.length === 0) {
-			duplicatesSection.createDiv({ cls: "semantic-graph-insights-hint", text: "No duplicates found." });
+			duplicatesSection.createDiv({ cls: "semantic-graph-insights-hint", text: t("insights.noDuplicates") });
 		} else {
 			for (const duplicate of duplicates) {
 				const row = duplicatesSection.createDiv({ cls: "semantic-graph-insights-row" });
@@ -207,9 +208,9 @@ export class InsightsPanel {
 		}
 
 		// --- Orphans ---
-		const orphansSection = this.createSection("Orphan notes", "Notes without any links.");
+		const orphansSection = this.createSection(t("insights.orphans.title"), t("insights.orphans.desc"));
 		if (orphans.length === 0) {
-			orphansSection.createDiv({ cls: "semantic-graph-insights-hint", text: "No orphan notes." });
+			orphansSection.createDiv({ cls: "semantic-graph-insights-hint", text: t("insights.noOrphans") });
 		} else {
 			for (const path of orphans) {
 				const row = orphansSection.createDiv({ cls: "semantic-graph-insights-row" });
@@ -219,23 +220,23 @@ export class InsightsPanel {
 
 		// --- Clusters / MOC ---
 		const clustersSection = this.createSection(
-			"Folder clusters",
-			"Create a Map of Content note linking every note in a cluster."
+			t("insights.clusters.title"),
+			t("insights.clusters.desc")
 		);
 		const usableRegions = regions.filter((region) => region.nodePaths.length > 1);
 		if (usableRegions.length === 0) {
-			clustersSection.createDiv({ cls: "semantic-graph-insights-hint", text: "No clusters available." });
+			clustersSection.createDiv({ cls: "semantic-graph-insights-hint", text: t("insights.noClusters") });
 		} else {
 			for (const region of usableRegions) {
 				const row = clustersSection.createDiv({ cls: "semantic-graph-insights-row" });
-				const label = region.folder === "/" ? "(vault root)" : region.folder;
+				const label = region.folder === "/" ? t("insights.vaultRoot") : region.folder;
 				row.createSpan({
 					cls: "semantic-graph-insights-cluster-name",
 					text: `${label} (${region.nodePaths.length})`,
 				});
 				const mocBtn = row.createEl("button", {
 					cls: "semantic-graph-btn semantic-graph-insights-action",
-					text: "Create MOC",
+					text: t("insights.createMoc"),
 					attr: { type: "button" },
 				});
 				mocBtn.addEventListener("click", () => void this.createMoc(region, mocBtn));
@@ -254,7 +255,7 @@ export class InsightsPanel {
 		});
 		const insertBtn = row.createEl("button", {
 			cls: "semantic-graph-btn semantic-graph-icon-btn semantic-graph-insights-action",
-			attr: { type: "button", "aria-label": "Insert link into source note" },
+			attr: { type: "button", "aria-label": t("insights.insertLinkAria") },
 		});
 		setIcon(insertBtn, "link");
 		insertBtn.addEventListener("click", () => void this.insertLink(suggestion, row));
@@ -298,7 +299,10 @@ export class InsightsPanel {
 				return `${content.replace(/\n+$/, "")}\n\n${linkText}\n`;
 			});
 
-			new Notice(`Linked "${this.basename(suggestion.source)}" → "${this.basename(suggestion.target)}"`);
+			new Notice(t("notice.linked", {
+				source: this.basename(suggestion.source),
+				target: this.basename(suggestion.target),
+			}));
 			row.addClass("is-done");
 
 			if (this.computed) {
@@ -306,7 +310,7 @@ export class InsightsPanel {
 				this.callbacks.onSuggestions(this.computed.suggestions);
 			}
 		} catch (error) {
-			new Notice(`Failed to insert link: ${error instanceof Error ? error.message : String(error)}`);
+			new Notice(t("notice.linkFailed", { message: error instanceof Error ? error.message : String(error) }));
 		}
 	}
 
@@ -332,10 +336,10 @@ export class InsightsPanel {
 			}
 
 			const created = await this.app.vault.create(mocPath, `${lines.join("\n")}\n`);
-			new Notice(`Created ${created.path}`);
+			new Notice(t("notice.mocCreated", { path: created.path }));
 			this.callbacks.onOpenNote(created.path);
 		} catch (error) {
-			new Notice(`Failed to create MOC: ${error instanceof Error ? error.message : String(error)}`);
+			new Notice(t("notice.mocFailed", { message: error instanceof Error ? error.message : String(error) }));
 		} finally {
 			button.disabled = false;
 		}
