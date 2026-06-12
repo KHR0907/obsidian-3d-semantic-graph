@@ -13,10 +13,19 @@ const AUTO_ROTATE_INITIAL_ANGLE = Math.PI / 4;
 const CAMERA_BASE_HEIGHT_RATIO = 0.42;
 const CAMERA_WOBBLE_HEIGHT = 110;
 const SPHERE_SIZE_MULTIPLIER = 0.68;
+const SUGGESTION_LINK_COLOR = "#f59e0b";
+const SUGGESTION_LINK_OPACITY = 0.85;
 const MIN_GRID_DIVISIONS = 24;
 const RESET_VIEW_DURATION_MS = 1000;
 const ORIGIN = new THREE.Vector3(0, 0, 0);
 const INITIAL_CAMERA_UP = new THREE.Vector3(0, 1, 0);
+
+export interface SuggestionSegment {
+	source: string;
+	target: string;
+	from: [number, number, number];
+	to: [number, number, number];
+}
 
 interface SceneControls {
 	enabled?: boolean;
@@ -84,6 +93,10 @@ export class GraphSceneRenderer {
 	private axesHelper: THREE.AxesHelper | null = null;
 	private gridHelper: THREE.GridHelper | null = null;
 	private clusterObjects: THREE.Object3D[] = [];
+	private suggestionObjects: THREE.Line[] = [];
+	private suggestionsVisible = true;
+	private timeCutoff: number | null = null;
+	private ctimeByPath = new Map<string, number>();
 	private currentClusterRegions: ClusterRegion[] = [];
 	private nodePathToClusterIdx = new Map<string, number>();
 	private clustersMode: "on" | "hover" | "off" = "hover";
@@ -148,6 +161,10 @@ export class GraphSceneRenderer {
 		this.disposeGraph();
 		this.currentData = data;
 		this.adjacency = this.buildAdjacency(data);
+		this.ctimeByPath.clear();
+		for (const node of data.nodes) {
+			if (node.ctime !== undefined) this.ctimeByPath.set(node.path, node.ctime);
+		}
 
 		const graph = createForceGraph3D()(this.container);
 		this.graph = graph
@@ -159,7 +176,7 @@ export class GraphSceneRenderer {
 			.nodeThreeObject((node: object) => this.buildNodeObject(node as GraphNode))
 			.nodeThreeObjectExtend(false)
 			.linkWidth(0.5)
-			.linkVisibility(() => this.linksVisible)
+			.linkVisibility((link: object) => this.linksVisible && this.isLinkInTime(link as GraphLink))
 			.linkOpacity(1)
 			.linkColor((link: object) => this.getLinkColor(link as GraphLink))
 			.enableNodeDrag(false)
@@ -216,10 +233,52 @@ export class GraphSceneRenderer {
 	setLinksVisible(visible: boolean): void {
 		this.linksVisible = visible;
 		if (this.graph) {
-			this.graph.linkVisibility(() => this.linksVisible);
+			this.graph.linkVisibility((link: object) => this.linksVisible && this.isLinkInTime(link as GraphLink));
 			this.graph.refresh();
 		}
 		this.syncLinkVisibilityInScene();
+	}
+
+	setSuggestionLinks(segments: SuggestionSegment[]): void {
+		this.clearSuggestionObjects();
+		if (!this.graph || segments.length === 0) return;
+
+		const scene = this.getGraphScene();
+		for (const segment of segments) {
+			const geometry = new THREE.BufferGeometry().setFromPoints([
+				new THREE.Vector3(segment.from[0], segment.from[1], segment.from[2]),
+				new THREE.Vector3(segment.to[0], segment.to[1], segment.to[2]),
+			]);
+			const material = new THREE.LineDashedMaterial({
+				color: SUGGESTION_LINK_COLOR,
+				transparent: true,
+				opacity: SUGGESTION_LINK_OPACITY,
+				dashSize: 6,
+				gapSize: 4,
+			});
+			const line = new THREE.Line(geometry, material);
+			line.computeLineDistances();
+			line.userData.source = segment.source;
+			line.userData.target = segment.target;
+			scene.add(line);
+			this.suggestionObjects.push(line);
+		}
+		this.syncSuggestionVisibility();
+	}
+
+	setSuggestionsVisible(visible: boolean): void {
+		this.suggestionsVisible = visible;
+		this.syncSuggestionVisibility();
+	}
+
+	/** Hide nodes/links created after the cutoff timestamp; null clears the filter. */
+	setTimeFilter(cutoffMs: number | null): void {
+		this.timeCutoff = cutoffMs;
+		for (const [path, object] of this.nodeObjects) {
+			object.visible = this.isPathInTime(path);
+		}
+		this.syncLinkVisibilityInScene();
+		this.syncSuggestionVisibility();
 	}
 
 	updateVisualOptions(visualOptions: GraphVisualOptions): void {
@@ -279,6 +338,7 @@ export class GraphSceneRenderer {
 	private disposeGraph(): void {
 		this.stopAutoRotate();
 		this.stopResetViewAnimation();
+		this.clearSuggestionObjects();
 		this.clearClusterObjects();
 		this.clearHelperObjects();
 		this.disposeNodeObjects();
@@ -428,11 +488,44 @@ export class GraphSceneRenderer {
 		if (!this.graph) return;
 		const scene = this.getGraphScene();
 		scene.traverse((object) => {
-			const graphObject = object as THREE.Object3D & { __graphObjType?: string };
+			const graphObject = object as THREE.Object3D & { __graphObjType?: string; __data?: GraphLink };
 			if (graphObject.__graphObjType === "link") {
-				graphObject.visible = this.linksVisible;
+				const inTime = !graphObject.__data || this.isLinkInTime(graphObject.__data);
+				graphObject.visible = this.linksVisible && inTime;
 			}
 		});
+	}
+
+	private isPathInTime(path: string | null): boolean {
+		if (this.timeCutoff === null || !path) return true;
+		const ctime = this.ctimeByPath.get(path);
+		return ctime === undefined || ctime <= this.timeCutoff;
+	}
+
+	private isLinkInTime(link: GraphLink): boolean {
+		if (this.timeCutoff === null) return true;
+		return this.isPathInTime(getNodePath(link.source)) && this.isPathInTime(getNodePath(link.target));
+	}
+
+	private syncSuggestionVisibility(): void {
+		for (const line of this.suggestionObjects) {
+			const source = line.userData.source as string;
+			const target = line.userData.target as string;
+			line.visible = this.suggestionsVisible && this.isPathInTime(source) && this.isPathInTime(target);
+		}
+	}
+
+	private clearSuggestionObjects(): void {
+		if (!this.graph) {
+			this.suggestionObjects = [];
+			return;
+		}
+		const scene = this.getGraphScene();
+		for (const line of this.suggestionObjects) {
+			scene.remove(line);
+			this.disposeObject(line);
+		}
+		this.suggestionObjects = [];
 	}
 
 	private enableAutoRotate(): void {

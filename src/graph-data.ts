@@ -27,6 +27,7 @@ export function buildGraphData(app: App, settings: PluginSettings): GraphData {
 			path: file.path,
 			color: colorMap.get(groupKey)!,
 			size,
+			ctime: file.stat.ctime,
 		});
 
 		nodeSet.add(file.path);

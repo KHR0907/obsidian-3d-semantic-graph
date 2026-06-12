@@ -1,4 +1,4 @@
-import { GraphSceneRenderer } from "./graph-scene-renderer";
+import { GraphSceneRenderer, SuggestionSegment } from "./graph-scene-renderer";
 import { ClusterRegion } from "./clustered-sphere-layout";
 import { GraphData, GraphNode, GraphVisualOptions } from "./types";
 
@@ -57,6 +57,18 @@ export class GraphRenderer {
 	setLinksVisible(visible: boolean): void {
 		this.linksVisible = visible;
 		this.sceneRenderer.setLinksVisible(visible);
+	}
+
+	setSuggestionLinks(segments: SuggestionSegment[]): void {
+		this.sceneRenderer.setSuggestionLinks(segments);
+	}
+
+	setSuggestionsVisible(visible: boolean): void {
+		this.sceneRenderer.setSuggestionsVisible(visible);
+	}
+
+	setTimeFilter(cutoffMs: number | null): void {
+		this.sceneRenderer.setTimeFilter(cutoffMs);
 	}
 
 	updateVisualOptions(visualOptions: GraphVisualOptions): void {
