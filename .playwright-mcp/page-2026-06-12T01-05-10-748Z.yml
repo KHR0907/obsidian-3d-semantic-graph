@@ -1,0 +1,5 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - img [ref=e4]
+    - paragraph [ref=e6]: Logging in with your Obsidian account...
+  - alert [ref=e7]

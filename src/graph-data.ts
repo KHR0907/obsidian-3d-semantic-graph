@@ -57,8 +57,11 @@ function getGroupKey(app: App, file: TFile, colorBy: "folder" | "tag"): string {
 		const cache = app.metadataCache.getFileCache(file);
 		if (cache?.tags && cache.tags.length > 0) return cache.tags[0].tag;
 		if (cache?.frontmatter?.tags) {
-			const tags = cache.frontmatter.tags;
-			if (Array.isArray(tags) && tags.length > 0) return "#" + tags[0];
+			const tags: unknown = cache.frontmatter.tags;
+			if (Array.isArray(tags) && tags.length > 0) {
+				const first: unknown = tags[0];
+				if (typeof first === "string") return "#" + first;
+			}
 			if (typeof tags === "string") return "#" + tags;
 		}
 		return "(untagged)";

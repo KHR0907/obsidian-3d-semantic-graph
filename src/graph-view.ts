@@ -348,7 +348,7 @@ export class SemanticGraphView extends ItemView {
 
 			const blob = new Blob([html], { type: "text/html" });
 			const url = URL.createObjectURL(blob);
-			const anchor = document.createElement("a");
+			const anchor = activeDocument.createElement("a");
 			anchor.href = url;
 			anchor.download = "semantic-graph.html";
 			anchor.click();
@@ -761,7 +761,7 @@ export class SemanticGraphView extends ItemView {
 		if (settings.sceneTheme === "dark" || settings.sceneTheme === "light") {
 			return settings.sceneTheme;
 		}
-		return document.body.classList.contains("theme-dark") ? "dark" : "light";
+		return activeDocument.body.classList.contains("theme-dark") ? "dark" : "light";
 	}
 
 	private getVisualOptions(settings: PluginSettings = this.settings): GraphVisualOptions {

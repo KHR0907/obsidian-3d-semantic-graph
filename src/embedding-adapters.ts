@@ -30,6 +30,11 @@ abstract class BaseEmbeddingAdapter implements EmbeddingProviderAdapter {
 	abstract embed(texts: string[]): Promise<number[][]>;
 }
 
+interface OpenAIEmbeddingResponse {
+	data?: { index: number; embedding: number[] }[];
+	error?: { message?: string };
+}
+
 class OpenAIEmbeddingAdapter extends BaseEmbeddingAdapter {
 	readonly provider = "openai" as const;
 
@@ -47,17 +52,26 @@ class OpenAIEmbeddingAdapter extends BaseEmbeddingAdapter {
 			}),
 		});
 
+		const body = response.json as OpenAIEmbeddingResponse;
 		if (response.status !== 200) {
-			const errorBody = response.json;
 			throw new Error(
-				`OpenAI API error (${response.status}): ${errorBody?.error?.message || "Unknown error"}`
+				`OpenAI API error (${response.status}): ${body?.error?.message || "Unknown error"}`
 			);
 		}
 
-		return response.json.data
-			.sort((a: { index: number }, b: { index: number }) => a.index - b.index)
-			.map((item: { embedding: number[] }) => item.embedding);
+		const data = body?.data;
+		if (!Array.isArray(data) || data.length !== texts.length) {
+			throw new Error("OpenAI returned an unexpected embedding response.");
+		}
+		return data
+			.sort((a, b) => a.index - b.index)
+			.map((item) => item.embedding);
 	}
+}
+
+interface OllamaEmbedResponse {
+	embeddings?: number[][];
+	error?: string;
 }
 
 class OllamaEmbeddingAdapter extends BaseEmbeddingAdapter {
@@ -80,7 +94,7 @@ class OllamaEmbeddingAdapter extends BaseEmbeddingAdapter {
 		if (response.status !== 200) {
 			let detail = "";
 			try {
-				detail = response.json?.error ?? "";
+				detail = (response.json as OllamaEmbedResponse)?.error ?? "";
 			} catch {
 				// Non-JSON error body
 			}
@@ -89,11 +103,11 @@ class OllamaEmbeddingAdapter extends BaseEmbeddingAdapter {
 			);
 		}
 
-		const embeddings = response.json?.embeddings;
+		const embeddings = (response.json as OllamaEmbedResponse)?.embeddings;
 		if (!Array.isArray(embeddings) || embeddings.length !== texts.length) {
 			throw new Error("Ollama returned an unexpected embedding response.");
 		}
-		return embeddings as number[][];
+		return embeddings;
 	}
 }
 

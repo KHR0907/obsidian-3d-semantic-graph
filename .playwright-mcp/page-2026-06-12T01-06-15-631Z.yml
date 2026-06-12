@@ -1,0 +1,45 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link [ref=e7] [cursor=pointer]:
+          - /url: /account
+          - generic [ref=e8]:
+            - img [ref=e9]
+            - img [ref=e15]
+        - navigation [ref=e24]:
+          - link "Profile" [ref=e25] [cursor=pointer]:
+            - /url: /account/profile
+            - img [ref=e26]
+            - text: Profile
+          - link "Plugins" [ref=e29] [cursor=pointer]:
+            - /url: /account/plugins
+            - img [ref=e30]
+            - text: Plugins
+          - link "Themes" [ref=e32] [cursor=pointer]:
+            - /url: /account/themes
+            - img [ref=e33]
+            - text: Themes
+        - generic [ref=e39]:
+          - link "Community site" [ref=e40] [cursor=pointer]:
+            - /url: /
+            - img [ref=e41]
+            - generic [ref=e43]: Community site
+          - button "Log out" [ref=e44] [cursor=pointer]:
+            - img [ref=e45]
+            - text: Log out
+    - generic [ref=e49]:
+      - heading "Preview a branch scan" [level=2] [ref=e50]
+      - paragraph [ref=e51]: Run the automated review against any branch, tag, or commit without requiring a release.
+      - generic [ref=e52]:
+        - generic [ref=e53]:
+          - generic [ref=e54]: Branch, tag, or commit SHA
+          - textbox "Branch, tag, or commit SHA" [ref=e55]:
+            - /placeholder: Leave blank for default branch
+            - text: 1.1.0
+        - paragraph [ref=e60]: A scan is already in progress for this entry
+        - generic [ref=e56]:
+          - link "Cancel" [ref=e57] [cursor=pointer]:
+            - /url: /account/plugins/3d-semantic-graph
+          - button "Run preview scan" [ref=e58] [cursor=pointer]
+  - alert [ref=e59]

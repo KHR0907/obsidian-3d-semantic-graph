@@ -385,7 +385,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 	}
 
 	private uploadVectorsJson(): void {
-		const input = document.createElement("input");
+		const input = activeDocument.createElement("input");
 		input.type = "file";
 		input.accept = "application/json,.json";
 		input.onchange = async () => {
@@ -458,7 +458,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 	private downloadJsonFile(fileName: string, raw: string): void {
 		const blob = new Blob([raw], { type: "application/json" });
 		const url = URL.createObjectURL(blob);
-		const anchor = document.createElement("a");
+		const anchor = activeDocument.createElement("a");
 		anchor.href = url;
 		anchor.download = fileName;
 		anchor.click();

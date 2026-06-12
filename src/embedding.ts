@@ -31,7 +31,7 @@ export class EmbeddingService {
 			const adapter = this.app.vault.adapter;
 			if (await adapter.exists(path)) {
 				const data = await adapter.read(path);
-				const parsed: EmbeddingCache = JSON.parse(data);
+				const parsed = JSON.parse(data) as EmbeddingCache;
 				if (parsed.modelId === getEmbeddingCacheModelId(this.settings) && parsed.version === CACHE_VERSION) {
 					this.cache = parsed;
 				} else {
@@ -135,7 +135,10 @@ export class EmbeddingService {
 		text = text.replace(/`[^`]*`/g, "");
 		text = text.replace(/!\[.*?\]\(.*?\)/g, "");
 		text = text.replace(/\[([^\]]*)\]\(.*?\)/g, "$1");
-		text = text.replace(/\[\[([^\]|]*?)(?:\|([^\]]*?))?\]\]/g, (_, target, alias) => alias || target);
+		text = text.replace(
+			/\[\[([^\]|]*?)(?:\|([^\]]*?))?\]\]/g,
+			(_match: string, target: string, alias: string | undefined) => alias || target
+		);
 		text = text.replace(/<[^>]+>/g, "");
 		text = text.replace(/^#{1,6}\s+/gm, "");
 		text = text.replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, "$1");

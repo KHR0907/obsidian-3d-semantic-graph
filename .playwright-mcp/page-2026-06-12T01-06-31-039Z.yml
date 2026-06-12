@@ -1,0 +1,442 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link [ref=e7] [cursor=pointer]:
+          - /url: /account
+          - generic [ref=e8]:
+            - img [ref=e9]
+            - img [ref=e15]
+        - navigation [ref=e24]:
+          - link "Profile" [ref=e25] [cursor=pointer]:
+            - /url: /account/profile
+            - img [ref=e26]
+            - text: Profile
+          - link "Plugins" [ref=e29] [cursor=pointer]:
+            - /url: /account/plugins
+            - img [ref=e30]
+            - text: Plugins
+          - link "Themes" [ref=e32] [cursor=pointer]:
+            - /url: /account/themes
+            - img [ref=e33]
+            - text: Themes
+        - generic [ref=e39]:
+          - link "Community site" [ref=e40] [cursor=pointer]:
+            - /url: /
+            - img [ref=e41]
+            - generic [ref=e43]: Community site
+          - button "Log out" [ref=e44] [cursor=pointer]:
+            - img [ref=e45]
+            - text: Log out
+    - generic [ref=e49]:
+      - generic [ref=e50]:
+        - img [ref=e52]
+        - heading "3D Semantic Graph" [level=2] [ref=e60]
+      - generic [ref=e61]:
+        - generic [ref=e62]:
+          - link "View listing" [ref=e63] [cursor=pointer]:
+            - /url: /plugins/3d-semantic-graph
+          - link "Edit listing" [ref=e64] [cursor=pointer]:
+            - /url: /account/plugins/3d-semantic-graph/edit
+          - button "More actions" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+        - generic [ref=e71]:
+          - img [ref=e72]
+          - paragraph [ref=e75]: Your entry is live. An automated review is in progress.
+        - generic [ref=e76]:
+          - heading "Reviews" [level=3] [ref=e78]:
+            - img [ref=e79]
+            - text: Reviews
+          - generic [ref=e82]:
+            - group [ref=e83]:
+              - 'generic "Date: Jun 12, 2026 Version: 1.1.0 Commit: c0751e4 Pending" [ref=e84] [cursor=pointer]':
+                - generic [ref=e85]: "Date: Jun 12, 2026"
+                - generic [ref=e86]: "Version: 1.1.0"
+                - generic [ref=e87]:
+                  - text: "Commit:"
+                  - link "c0751e4" [ref=e88]:
+                    - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/commit/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd
+                - generic [ref=e89]: Pending
+                - img [ref=e91]
+              - generic [ref=e93]:
+                - paragraph [ref=e94]: These results are incomplete. More checks are still running.
+                - generic [ref=e95]:
+                  - generic [ref=e96]:
+                    - heading "Manifest" [level=4] [ref=e97]
+                    - button "Copy as Markdown" [ref=e99] [cursor=pointer]:
+                      - img [ref=e100]
+                  - list [ref=e103]:
+                    - listitem [ref=e104]:
+                      - generic [ref=e106]: Error
+                      - generic [ref=e107]:
+                        - generic [ref=e108]:
+                          - text: The plugin ID in
+                          - code [ref=e109]: manifest.json
+                          - text: (
+                          - code [ref=e110]: semantic-graph
+                          - text: ) does not match the existing plugin ID (
+                          - code [ref=e111]: 3d-semantic-graph
+                          - text: )
+                          - link "manifest.json:2" [ref=e114] [cursor=pointer]:
+                            - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/manifest.json#L2
+                        - button "Copy as Markdown" [ref=e116] [cursor=pointer]:
+                          - img [ref=e117]
+                - generic [ref=e120]:
+                  - generic [ref=e121]:
+                    - heading "Releases" [level=4] [ref=e122]
+                    - button "Copy as Markdown" [ref=e124] [cursor=pointer]:
+                      - img [ref=e125]
+                  - list [ref=e128]:
+                    - listitem [ref=e129]:
+                      - generic [ref=e131]: Recommendation
+                      - generic [ref=e132]:
+                        - generic [ref=e133]:
+                          - text: Missing GitHub artifact attestations for release assets
+                          - generic [ref=e134]: main.js, styles.css
+                          - generic [ref=e135]:
+                            - text: Artifact attestations let users cryptographically verify the provenance of the release assets, proving they were built from the source repository.
+                            - link "Learn more" [ref=e136] [cursor=pointer]:
+                              - /url: https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds
+                        - button "Copy as Markdown" [ref=e138] [cursor=pointer]:
+                          - img [ref=e139]
+                - generic [ref=e142]:
+                  - generic [ref=e143]:
+                    - heading "Behavior" [level=4] [ref=e144]
+                    - button "Copy as Markdown" [ref=e146] [cursor=pointer]:
+                      - img [ref=e147]
+                  - list [ref=e150]:
+                    - listitem [ref=e151]:
+                      - generic [ref=e153]: Recommendation
+                      - generic [ref=e154]:
+                        - generic [ref=e155]:
+                          - strong [ref=e156]: Vault Enumeration
+                          - text: ": Enumerates all files in the vault ("
+                          - code [ref=e157]: vault.getFiles
+                          - text: ","
+                          - code [ref=e158]: getMarkdownFiles
+                          - text: ", etc.). Gives the plugin access to every file path in the vault."
+                        - button "Copy as Markdown" [ref=e160] [cursor=pointer]:
+                          - img [ref=e161]
+                    - listitem [ref=e164]:
+                      - generic [ref=e166]: Recommendation
+                      - generic [ref=e167]:
+                        - generic [ref=e168]:
+                          - strong [ref=e169]: Dynamic Code Execution
+                          - text: ": Executes dynamically generated code via"
+                          - code [ref=e170]: eval()
+                          - text: or
+                          - code [ref=e171]: new Function()
+                          - text: . Prevents full static analysis of plugin behavior.
+                        - button "Copy as Markdown" [ref=e173] [cursor=pointer]:
+                          - img [ref=e174]
+                    - listitem [ref=e177]:
+                      - generic [ref=e179]: Pass
+                      - generic [ref=e180]:
+                        - generic [ref=e181]:
+                          - strong [ref=e182]: Vault Read
+                          - text: ": Reads individual vault files via the Obsidian API ("
+                          - code [ref=e183]: vault.read
+                          - text: ","
+                          - code [ref=e184]: vault.cachedRead
+                          - text: )
+                        - button "Copy as Markdown" [ref=e186] [cursor=pointer]:
+                          - img [ref=e187]
+                    - listitem [ref=e190]:
+                      - generic [ref=e192]: Pass
+                      - generic [ref=e193]:
+                        - generic [ref=e194]:
+                          - strong [ref=e195]: Vault Write
+                          - text: ": Creates or modifies vault files via the Obsidian API ("
+                          - code [ref=e196]: vault.modify
+                          - text: ","
+                          - code [ref=e197]: vault.create
+                          - text: ", etc.)"
+                        - button "Copy as Markdown" [ref=e199] [cursor=pointer]:
+                          - img [ref=e200]
+                - generic [ref=e203]:
+                  - generic [ref=e204]:
+                    - heading "Source code" [level=4] [ref=e205]
+                    - button "Copy as Markdown" [ref=e207] [cursor=pointer]:
+                      - img [ref=e208]
+                  - list [ref=e211]:
+                    - listitem [ref=e212]:
+                      - generic [ref=e214]: Error
+                      - generic [ref=e215]:
+                        - generic [ref=e216]:
+                          - text: Uses Obsidian APIs newer than the declared
+                          - code [ref=e217]: minAppVersion
+                          - generic [ref=e218]: obsidianmd/no-unsupported-api
+                          - generic [ref=e219]:
+                            - link "src/main.ts:119" [ref=e221] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/main.ts#L119
+                            - link "src/main.ts:129" [ref=e223] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/main.ts#L129
+                            - link "src/main.ts:135" [ref=e225] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/main.ts#L135
+                            - link "src/main.ts:144" [ref=e227] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/main.ts#L144
+                        - button "Copy as Markdown" [ref=e229] [cursor=pointer]:
+                          - img [ref=e230]
+                    - listitem [ref=e233]:
+                      - generic [ref=e235]: Warning
+                      - generic [ref=e236]:
+                        - generic [ref=e237]:
+                          - text: Unsafe assignment of an
+                          - code [ref=e238]: any
+                          - text: value.
+                          - generic [ref=e239]:
+                            - link "src/embedding-adapters.ts:51" [ref=e241] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/embedding-adapters.ts#L51
+                            - link "src/embedding-adapters.ts:83" [ref=e243] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/embedding-adapters.ts#L83
+                            - link "src/embedding-adapters.ts:92" [ref=e245] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/embedding-adapters.ts#L92
+                            - link "src/embedding.ts:34" [ref=e247] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/embedding.ts#L34
+                            - link "src/graph-data.ts:60" [ref=e249] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/graph-data.ts#L60
+                            - link "src/main.ts:64" [ref=e251] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/main.ts#L64
+                        - button "Copy as Markdown" [ref=e253] [cursor=pointer]:
+                          - img [ref=e254]
+                    - listitem [ref=e257]:
+                      - generic [ref=e259]: Warning
+                      - generic [ref=e260]:
+                        - generic [ref=e261]:
+                          - text: Unsafe member access .error on an
+                          - code [ref=e262]: any
+                          - text: value.
+                          - generic [ref=e263]:
+                            - link "src/embedding-adapters.ts:53" [ref=e265] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/embedding-adapters.ts#L53
+                            - link "src/embedding-adapters.ts:83" [ref=e267] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/embedding-adapters.ts#L83
+                        - button "Copy as Markdown" [ref=e269] [cursor=pointer]:
+                          - img [ref=e270]
+                    - listitem [ref=e273]:
+                      - generic [ref=e275]: Warning
+                      - generic [ref=e276]:
+                        - generic [ref=e277]:
+                          - text: Returns unsafe values from typed code
+                          - generic [ref=e278]: "@typescript-eslint/no-unsafe-return"
+                          - generic [ref=e279]:
+                            - link "src/embedding-adapters.ts:57" [ref=e281] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/embedding-adapters.ts#L57-L59
+                            - link "src/embedding.ts:138" [ref=e283] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/embedding.ts#L138
+                        - button "Copy as Markdown" [ref=e285] [cursor=pointer]:
+                          - img [ref=e286]
+                    - listitem [ref=e289]:
+                      - generic [ref=e291]: Warning
+                      - generic [ref=e292]:
+                        - generic [ref=e293]:
+                          - text: Unsafe call of an
+                          - code [ref=e294]: any
+                          - text: typed value.
+                          - generic [ref=e295]:
+                            - link "src/embedding-adapters.ts:57" [ref=e297] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/embedding-adapters.ts#L57-L59
+                            - link "src/embedding-adapters.ts:57" [ref=e299] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/embedding-adapters.ts#L57-L58
+                        - button "Copy as Markdown" [ref=e301] [cursor=pointer]:
+                          - img [ref=e302]
+                    - listitem [ref=e305]:
+                      - generic [ref=e307]: Warning
+                      - generic [ref=e308]:
+                        - generic [ref=e309]:
+                          - text: Unsafe member access .data on an
+                          - code [ref=e310]: any
+                          - text: value.
+                          - link "src/embedding-adapters.ts:57" [ref=e313] [cursor=pointer]:
+                            - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/embedding-adapters.ts#L57
+                        - button "Copy as Markdown" [ref=e315] [cursor=pointer]:
+                          - img [ref=e316]
+                    - listitem [ref=e319]:
+                      - generic [ref=e321]: Warning
+                      - generic [ref=e322]:
+                        - generic [ref=e323]:
+                          - text: Unsafe member access .map on an
+                          - code [ref=e324]: any
+                          - text: value.
+                          - link "src/embedding-adapters.ts:59" [ref=e327] [cursor=pointer]:
+                            - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/embedding-adapters.ts#L59
+                        - button "Copy as Markdown" [ref=e329] [cursor=pointer]:
+                          - img [ref=e330]
+                    - listitem [ref=e333]:
+                      - generic [ref=e335]: Warning
+                      - generic [ref=e336]:
+                        - generic [ref=e337]:
+                          - text: Unsafe member access .embeddings on an
+                          - code [ref=e338]: any
+                          - text: value.
+                          - link "src/embedding-adapters.ts:92" [ref=e341] [cursor=pointer]:
+                            - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/embedding-adapters.ts#L92
+                        - button "Copy as Markdown" [ref=e343] [cursor=pointer]:
+                          - img [ref=e344]
+                    - listitem [ref=e347]:
+                      - generic [ref=e349]: Warning
+                      - generic [ref=e350]:
+                        - generic [ref=e351]:
+                          - text: Use 'activeDocument' instead of 'document' for popout window compatibility.
+                          - generic [ref=e352]:
+                            - link "src/graph-view.ts:351" [ref=e354] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/graph-view.ts#L351
+                            - link "src/graph-view.ts:764" [ref=e356] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/graph-view.ts#L764
+                            - link "src/neighbors-view.ts:271" [ref=e358] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/neighbors-view.ts#L271
+                            - link "src/settings.ts:388" [ref=e360] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L388
+                            - link "src/settings.ts:461" [ref=e362] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L461
+                        - button "Copy as Markdown" [ref=e364] [cursor=pointer]:
+                          - img [ref=e365]
+                    - listitem [ref=e368]:
+                      - generic [ref=e370]: Warning
+                      - generic [ref=e371]:
+                        - generic [ref=e372]:
+                          - text: Use 'window.setTimeout()' instead of 'setTimeout()' for popout window compatibility.
+                          - link "src/insights.ts:170" [ref=e375] [cursor=pointer]:
+                            - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/insights.ts#L170
+                        - button "Copy as Markdown" [ref=e377] [cursor=pointer]:
+                          - img [ref=e378]
+                    - listitem [ref=e381]:
+                      - generic [ref=e383]: Warning
+                      - generic [ref=e384]:
+                        - generic [ref=e385]:
+                          - text: The command ID should not include the plugin ID. Obsidian will make sure that there are no conflicts with other plugins.
+                          - link "src/main.ts:45" [ref=e388] [cursor=pointer]:
+                            - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/main.ts#L45
+                        - button "Copy as Markdown" [ref=e390] [cursor=pointer]:
+                          - img [ref=e391]
+                    - listitem [ref=e394]:
+                      - generic [ref=e396]: Recommendation
+                      - generic [ref=e397]:
+                        - generic [ref=e398]:
+                          - code [ref=e399]: display
+                          - text: "is deprecated. Since 1.13.0. Use {@link getSettingDefinitions } instead."
+                          - generic [ref=e400]:
+                            - link "src/settings.ts:47" [ref=e402] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L47
+                            - link "src/settings.ts:119" [ref=e404] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L119
+                            - link "src/settings.ts:161" [ref=e406] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L161
+                            - link "src/settings.ts:355" [ref=e408] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L355
+                            - link "src/settings.ts:400" [ref=e410] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L400
+                        - button "Copy as Markdown" [ref=e412] [cursor=pointer]:
+                          - img [ref=e413]
+                    - listitem [ref=e416]:
+                      - generic [ref=e418]: Recommendation
+                      - generic [ref=e419]:
+                        - generic [ref=e420]:
+                          - code [ref=e421]: setDynamicTooltip
+                          - text: is deprecated. The value is now always shown inline next to the slider.
+                          - generic [ref=e422]:
+                            - link "src/settings.ts:222" [ref=e424] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L222
+                            - link "src/settings.ts:235" [ref=e426] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L235
+                            - link "src/settings.ts:248" [ref=e428] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L248
+                            - link "src/settings.ts:261" [ref=e430] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L261
+                            - link "src/settings.ts:274" [ref=e432] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L274
+                            - link "src/settings.ts:287" [ref=e434] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L287
+                            - link "src/settings.ts:320" [ref=e436] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L320
+                            - link "src/settings.ts:333" [ref=e438] [cursor=pointer]:
+                              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L333
+                        - button "Copy as Markdown" [ref=e440] [cursor=pointer]:
+                          - img [ref=e441]
+                    - listitem [ref=e444]:
+                      - generic [ref=e446]: Recommendation
+                      - generic [ref=e447]:
+                        - generic [ref=e448]:
+                          - code [ref=e449]: setWarning
+                          - text: "is deprecated. Use {@link setDestructive} for a destructive button, or"
+                          - code [ref=e450]: setDestructive().setCta()
+                          - text: for a destructive primary action.
+                          - link "src/settings.ts:348" [ref=e453] [cursor=pointer]:
+                            - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/blob/c0751e4a9d21d69b150a020672bd6b3d3e1f7bdd/src/settings.ts#L348
+                        - button "Copy as Markdown" [ref=e455] [cursor=pointer]:
+                          - img [ref=e456]
+                - generic [ref=e459]:
+                  - generic [ref=e460]:
+                    - heading "Dependencies" [level=4] [ref=e461]
+                    - button "Copy as Markdown" [ref=e463] [cursor=pointer]:
+                      - img [ref=e464]
+                  - list [ref=e467]:
+                    - listitem [ref=e468]:
+                      - generic [ref=e470]: Warning
+                      - generic [ref=e471]:
+                        - generic [ref=e472]:
+                          - text: Dependency has a potential vulnerability advisory
+                          - generic [ref=e473]: lodash-es
+                          - link "Learn more" [ref=e475] [cursor=pointer]:
+                            - /url: https://github.com/advisories/GHSA-r5fr-rjxr-66jc
+                        - button "Copy as Markdown" [ref=e477] [cursor=pointer]:
+                          - img [ref=e478]
+            - group [ref=e481]:
+              - 'generic "Date: Jun 12, 2026 Version: 1.0.2 Commit: 590f6b5 Failed" [ref=e482] [cursor=pointer]':
+                - generic [ref=e483]: "Date: Jun 12, 2026"
+                - generic [ref=e484]: "Version: 1.0.2"
+                - generic [ref=e485]:
+                  - text: "Commit:"
+                  - link "590f6b5" [ref=e486]:
+                    - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/commit/590f6b59223ab70fa1b61ef313fb823f8589b2a5
+                - generic [ref=e487]: Failed
+                - img [ref=e489]
+            - group [ref=e491]:
+              - 'generic "Preview Date: Jun 12, 2026 Ref: 590f6b59 Commit: 590f6b5 Failed" [ref=e492] [cursor=pointer]':
+                - generic [ref=e493]: Preview
+                - generic [ref=e494]: "Date: Jun 12, 2026"
+                - generic [ref=e495]: "Ref: 590f6b59"
+                - generic [ref=e496]:
+                  - text: "Commit:"
+                  - link "590f6b5" [ref=e497]:
+                    - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/commit/590f6b59223ab70fa1b61ef313fb823f8589b2a5
+                - generic [ref=e498]: Failed
+                - img [ref=e500]
+            - group [ref=e502]:
+              - 'generic "Date: May 15, 2026 Version: 1.0.0 Commit: 172aa4b Failed" [ref=e503] [cursor=pointer]':
+                - generic [ref=e504]: "Date: May 15, 2026"
+                - generic [ref=e505]: "Version: 1.0.0"
+                - generic [ref=e506]:
+                  - text: "Commit:"
+                  - link "172aa4b" [ref=e507]:
+                    - /url: https://github.com/khr0907/obsidian-3d-semantic-graph/commit/172aa4be1c5b3c34f0c81069f122c51519996d2b
+                - generic [ref=e508]: Failed
+                - img [ref=e510]
+        - generic [ref=e512]:
+          - heading "Current release" [level=3] [ref=e513]:
+            - img [ref=e514]
+            - text: Current release
+          - generic [ref=e518]:
+            - generic [ref=e519]: Version
+            - generic [ref=e520]: 1.1.0
+            - generic [ref=e521]: Published
+            - generic [ref=e522]: Jun 12, 2026
+            - generic [ref=e523]: Total releases
+            - generic [ref=e524]: "4"
+            - generic [ref=e525]: Total downloads
+            - generic [ref=e526]: "17"
+        - generic [ref=e527]:
+          - heading "GitHub Repository" [level=3] [ref=e528]:
+            - img "GitHub" [ref=e529]
+            - text: Repository
+          - generic [ref=e531]:
+            - generic [ref=e532]: GitHub
+            - link "khr0907/obsidian-3d-semantic-graph" [ref=e534] [cursor=pointer]:
+              - /url: https://github.com/khr0907/obsidian-3d-semantic-graph
+            - generic [ref=e535]: Last pushed
+            - generic [ref=e536]: Jun 12, 2026
+            - generic [ref=e537]: Stars
+            - generic [ref=e538]: "2"
+            - generic [ref=e539]: Open issues
+            - generic [ref=e540]: "0"
+  - alert [ref=e541]

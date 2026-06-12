@@ -268,7 +268,7 @@ export class NeighborsView extends ItemView {
 		const sceneTheme =
 			settings.sceneTheme === "dark" || settings.sceneTheme === "light"
 				? settings.sceneTheme
-				: document.body.classList.contains("theme-dark")
+				: activeDocument.body.classList.contains("theme-dark")
 					? "dark"
 					: "light";
 		return {
