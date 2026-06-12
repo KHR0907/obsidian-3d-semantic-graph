@@ -7,6 +7,7 @@ import {
 } from "./types";
 import { SemanticGraphSettingTab } from "./settings";
 import { SemanticGraphView, VIEW_TYPE } from "./graph-view";
+import { NeighborsView, NEIGHBORS_VIEW_TYPE } from "./neighbors-view";
 
 export default class SemanticGraphPlugin extends Plugin {
 	settings: PluginSettings = createDefaultSettings();
@@ -27,6 +28,15 @@ export default class SemanticGraphPlugin extends Plugin {
 			);
 		});
 
+		this.registerView(NEIGHBORS_VIEW_TYPE, (leaf: WorkspaceLeaf) => {
+			return new NeighborsView(
+				leaf,
+				clonePluginSettings(this.settings),
+				this.manifest.dir!,
+				() => clonePluginSettings(this.settings)
+			);
+		});
+
 		this.addRibbonIcon("network", "Semantic graph", () => {
 			void this.activateView();
 		});
@@ -36,6 +46,14 @@ export default class SemanticGraphPlugin extends Plugin {
 			name: "Open graph view",
 			callback: () => {
 				void this.activateView();
+			},
+		});
+
+		this.addCommand({
+			id: "open-semantic-neighbors",
+			name: "Open semantic neighbors",
+			callback: () => {
+				void this.activateNeighborsView();
 			},
 		});
 
@@ -88,6 +106,27 @@ export default class SemanticGraphPlugin extends Plugin {
 				leaf.view.updateSettings(clonePluginSettings(nextSettings));
 			}
 		});
+		this.app.workspace.getLeavesOfType(NEIGHBORS_VIEW_TYPE).forEach((leaf) => {
+			if (leaf.view instanceof NeighborsView) {
+				leaf.view.updateSettings(clonePluginSettings(this.settings));
+			}
+		});
+	}
+
+	async activateNeighborsView() {
+		const existing = this.app.workspace.getLeavesOfType(NEIGHBORS_VIEW_TYPE);
+		if (existing.length > 0) {
+			await this.app.workspace.revealLeaf(existing[0]);
+			return;
+		}
+
+		const leaf = this.app.workspace.getRightLeaf(false);
+		if (!leaf) return;
+		await leaf.setViewState({
+			type: NEIGHBORS_VIEW_TYPE,
+			active: true,
+		});
+		await this.app.workspace.revealLeaf(leaf);
 	}
 
 	async activateView() {

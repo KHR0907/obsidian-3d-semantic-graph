@@ -48,6 +48,16 @@ export class EmbeddingService {
 		await this.app.vault.adapter.write(path, JSON.stringify(this.cache));
 	}
 
+	/** Read cached embeddings from disk without triggering any provider requests. */
+	async loadCachedEmbeddings(): Promise<Map<string, number[]>> {
+		await this.loadCache();
+		const result = new Map<string, number[]>();
+		for (const [path, entry] of Object.entries(this.cache.entries)) {
+			result.set(path, entry.embedding);
+		}
+		return result;
+	}
+
 	async getEmbeddings(
 		onProgress?: (current: number, total: number) => void
 	): Promise<Map<string, number[]>> {

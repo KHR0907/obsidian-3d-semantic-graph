@@ -265,6 +265,32 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Suggested links")
+			.setDesc("Maximum number of suggested links shown in the insights panel. Default: 20.")
+			.addSlider((slider) =>
+				slider
+					.setLimits(5, 100, 5)
+					.setValue(this.plugin.settings.suggestedLinkCount)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						await this.patchSettings({ suggestedLinkCount: value });
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Neighbor count")
+			.setDesc("Number of notes shown in the semantic neighbors sidebar. Default: 10.")
+			.addSlider((slider) =>
+				slider
+					.setLimits(3, 30, 1)
+					.setValue(this.plugin.settings.neighborCount)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						await this.patchSettings({ neighborCount: value });
+					})
+			);
+
+		new Setting(containerEl)
 			.setName("Exclude folders")
 			.setDesc("Comma-separated list of folders to exclude from the graph.")
 			.addText((text) =>
