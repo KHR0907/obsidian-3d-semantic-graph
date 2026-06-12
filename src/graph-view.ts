@@ -238,7 +238,8 @@ export class SemanticGraphView extends ItemView {
 
 		if (
 			previous.projectionMethod !== settings.projectionMethod ||
-			previous.layoutSeed !== settings.layoutSeed
+			previous.layoutSeed !== settings.layoutSeed ||
+			previous.timelineDateSource !== settings.timelineDateSource
 		) {
 			void this.loadGraph();
 		}

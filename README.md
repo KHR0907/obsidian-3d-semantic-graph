@@ -10,7 +10,7 @@ Desktop-only Obsidian plugin that visualizes your notes in an interactive 3D spa
 - **Local embeddings (Ollama)** — run fully offline with a local Ollama server, no API key required
 - **Insights panel** — suggested links (semantically close but unlinked note pairs, drawn as dashed lines and insertable with one click), potential duplicates, orphan notes, and per-cluster MOC (Map of Content) generation
 - **Semantic neighbors sidebar** — a mini 3D view plus ranked list of the active note's nearest semantic neighbors
-- **Timeline playback** — replay your vault's growth over time by note creation date (frontmatter `created` / `date created` when present, file ctime otherwise)
+- **Timeline playback** — replay your vault's growth over time by note creation date (file created time by default; optionally frontmatter `created` / `date created`)
 - **Interactive HTML export** — download the current graph as a standalone HTML file with deep links back into your vault
 - **Korean and English UI** — language setting (auto / English / 한국어); auto follows the Obsidian app language
 - **Clustered sphere fallback** — folder-based clustered layout with color-coded groups when no embeddings are available
@@ -96,6 +96,7 @@ npm run build  # production build
 | Custom Vector JSON | Upload/export vector JSON instead of API embeddings | Empty |
 | Projection Method | UMAP or PCA for dimensionality reduction | `umap` |
 | Layout Seed | Seed for deterministic layout | Random |
+| Timeline Date Source | Date the timeline uses: file created time or frontmatter `created` | `ctime` |
 | Suggested Links | Max suggested links in the insights panel | `20` |
 | Neighbor Count | Notes shown in the semantic neighbors sidebar | `10` |
 

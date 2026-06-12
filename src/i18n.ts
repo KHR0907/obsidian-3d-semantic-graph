@@ -199,6 +199,16 @@ const STRINGS = {
 		en: "Display connection lines between nodes. Default: off.",
 		ko: "노트 간 연결선을 표시합니다. 기본값: 끔.",
 	},
+	"settings.timelineSource.name": { en: "Timeline date source", ko: "타임라인 날짜 기준" },
+	"settings.timelineSource.desc": {
+		en: "Which date the timeline uses for each note. Default: file created time.",
+		ko: "타임라인이 노트별로 사용할 날짜 기준입니다. 기본값: 파일 생성 시각.",
+	},
+	"settings.timelineSource.ctime": { en: "File created time", ko: "파일 생성 시각" },
+	"settings.timelineSource.frontmatter": {
+		en: "Frontmatter created (falls back to file time)",
+		ko: "Frontmatter created (없으면 파일 생성 시각)",
+	},
 	"settings.showGrid.name": { en: "Show grid", ko: "그리드 표시" },
 	"settings.showGrid.desc": {
 		en: "Display a solid square grid on the ground plane. Default: on.",

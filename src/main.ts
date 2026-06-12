@@ -92,6 +92,10 @@ export default class SemanticGraphPlugin extends Plugin {
 			this.settings.language = "auto";
 		}
 
+		if (!["ctime", "frontmatter"].includes(this.settings.timelineDateSource)) {
+			this.settings.timelineDateSource = "ctime";
+		}
+
 		// Clean up legacy fields
 		const s = this.settings as unknown as Record<string, unknown>;
 		delete s.nodeAssetMode;

@@ -28,7 +28,9 @@ export function buildGraphData(app: App, settings: PluginSettings): GraphData {
 			path: file.path,
 			color: colorMap.get(groupKey)!,
 			size,
-			ctime: resolveCreatedTime(app.metadataCache.getFileCache(file)?.frontmatter, file.stat.ctime),
+			ctime: settings.timelineDateSource === "frontmatter"
+				? resolveCreatedTime(app.metadataCache.getFileCache(file)?.frontmatter, file.stat.ctime)
+				: file.stat.ctime,
 		});
 
 		nodeSet.add(file.path);

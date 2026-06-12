@@ -20,6 +20,7 @@ export interface PluginSettings {
 	umapNNeighbors: number;
 	umapMinDist: number;
 	nodeColorBy: "folder" | "tag";
+	timelineDateSource: "ctime" | "frontmatter";
 	showLinks: boolean;
 	showGrid: boolean;
 	showClusters: "on" | "hover" | "off";
@@ -50,6 +51,7 @@ export function createDefaultSettings(): PluginSettings {
 		umapNNeighbors: 40,
 		umapMinDist: 0.8,
 		nodeColorBy: "folder",
+		timelineDateSource: "ctime",
 		showLinks: false,
 		showGrid: true,
 		showClusters: "hover",

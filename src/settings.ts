@@ -209,6 +209,18 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 						desc: t("settings.showGrid.desc"),
 						control: { type: "toggle", key: "showGrid" },
 					},
+					{
+						name: t("settings.timelineSource.name"),
+						desc: t("settings.timelineSource.desc"),
+						control: {
+							type: "dropdown",
+							key: "timelineDateSource",
+							options: {
+								ctime: t("settings.timelineSource.ctime"),
+								frontmatter: t("settings.timelineSource.frontmatter"),
+							},
+						},
+					},
 				],
 			},
 			{
