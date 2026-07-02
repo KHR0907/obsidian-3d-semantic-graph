@@ -1,6 +1,6 @@
 {
 	"name": "semantic-graph",
-	"version": "1.3.2",
+	"version": "1.3.3",
 	"description": "3D Semantic Graph plugin for Obsidian",
 	"main": "main.js",
 	"scripts": {

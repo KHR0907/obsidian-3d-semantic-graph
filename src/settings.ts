@@ -2,7 +2,6 @@ import {
 	App,
 	Notice,
 	Setting,
-	SettingDefinitionItem,
 	normalizePath,
 	PluginSettingTab,
 	TFile,
@@ -31,7 +30,13 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	getSettingDefinitions(): SettingDefinitionItem[] {
+	/**
+	 * Declarative description of the settings pane. This is the single source of
+	 * truth for {@link display}; it deliberately does not use the 1.13
+	 * `getSettingDefinitions()` name or `SettingDefinitionItem` type, so the
+	 * plugin stays within the API surface its declared `minAppVersion` supports.
+	 */
+	private buildSettingDefinitions(): SettingDefinitionEntry[] {
 		const settings = this.plugin.settings;
 
 		return [
@@ -326,20 +331,17 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Render the settings pane from {@link getSettingDefinitions}.
+	 * Render the settings pane from {@link buildSettingDefinitions}.
 	 *
-	 * Obsidian 1.13+ auto-renders declarative settings, but older versions (and
-	 * the current public stable channel) lack that API and would show a blank
-	 * pane. Implementing `display()` makes the same definitions render on every
-	 * version — Obsidian uses a tab's own `display()` when present, so there is
-	 * no double render. {@link getSettingDefinitions} stays the single source of
-	 * truth; this walker only knows how to draw the subset of the declarative
+	 * The pane is described declaratively but rendered here with the stable
+	 * `Setting` API rather than Obsidian 1.13's `getSettingDefinitions()`
+	 * auto-render, so the plugin works on every version at or above its declared
+	 * `minAppVersion`. This walker only draws the subset of the declarative
 	 * schema the plugin actually uses.
 	 */
 	display(): void {
 		this.containerEl.empty();
-		const items = this.getSettingDefinitions() as unknown as SettingDefinitionEntry[];
-		for (const item of items) {
+		for (const item of this.buildSettingDefinitions()) {
 			if (item.type === "group" || item.type === "list") {
 				if (item.heading) {
 					new Setting(this.containerEl).setName(item.heading).setHeading();
@@ -585,7 +587,7 @@ type SettingControlSpec =
 	| { type: "toggle"; key: string }
 	| { type: "slider"; key: string; min: number; max: number; step: number };
 
-/** A top-level entry from `getSettingDefinitions()`: a group/list or a bare row. */
+/** A top-level entry from `buildSettingDefinitions()`: a group/list or a bare row. */
 type SettingDefinitionEntry =
 	| { type: "group" | "list"; heading?: string; items?: SettingDefinitionRow[] }
 	| ({ type?: undefined } & SettingDefinitionRow);
