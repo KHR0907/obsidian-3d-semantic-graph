@@ -38,7 +38,7 @@ Desktop-only Obsidian plugin that visualizes your notes in an interactive 3D spa
 
 ## Installation
 
-Requires Obsidian **1.13.0 or newer** (desktop only).
+Requires Obsidian **1.11.0 or newer** (desktop only).
 
 ### Community plugins
 
