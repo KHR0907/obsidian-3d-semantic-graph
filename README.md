@@ -99,7 +99,6 @@ npm run build  # production build
 | Timeline Date Source | Date the timeline uses: file created time or frontmatter `created` | `ctime` |
 | Suggested Links | Max suggested links in the insights panel | `20` |
 | Neighbor Count | Notes shown in the semantic neighbors sidebar | `10` |
-
 | Node Color By | Color nodes by folder or first tag | `folder` |
 | Show Links | Display link lines between notes | Off |
 | Show Grid | Display XZ grid plane | On |
