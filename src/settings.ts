@@ -325,6 +325,92 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 		];
 	}
 
+	/**
+	 * Render the settings pane from {@link getSettingDefinitions}.
+	 *
+	 * Obsidian 1.13+ auto-renders declarative settings, but older versions (and
+	 * the current public stable channel) lack that API and would show a blank
+	 * pane. Implementing `display()` makes the same definitions render on every
+	 * version — Obsidian uses a tab's own `display()` when present, so there is
+	 * no double render. {@link getSettingDefinitions} stays the single source of
+	 * truth; this walker only knows how to draw the subset of the declarative
+	 * schema the plugin actually uses.
+	 */
+	display(): void {
+		this.containerEl.empty();
+		const items = this.getSettingDefinitions() as unknown as SettingDefinitionEntry[];
+		for (const item of items) {
+			if (item.type === "group" || item.type === "list") {
+				if (item.heading) {
+					new Setting(this.containerEl).setName(item.heading).setHeading();
+				}
+				for (const child of item.items ?? []) {
+					this.renderDefinitionRow(child);
+				}
+				continue;
+			}
+			this.renderDefinitionRow(item as SettingDefinitionRow);
+		}
+	}
+
+	/** Re-render the whole pane; called after structural setting changes. */
+	update(): void {
+		this.display();
+	}
+
+	private renderDefinitionRow(def: SettingDefinitionRow): void {
+		if (!resolveVisible(def.visible)) return;
+
+		const setting = new Setting(this.containerEl);
+		if (def.name) setting.setName(def.name);
+		if (def.desc) setting.setDesc(def.desc);
+
+		if (typeof def.render === "function") {
+			// This plugin's render callbacks only use the Setting argument; the
+			// SettingGroup param is never read, so an undefined shim is safe.
+			def.render(setting, undefined as unknown as never);
+			return;
+		}
+
+		if (def.control) {
+			this.applyControl(setting, def.control);
+		}
+	}
+
+	private applyControl(setting: Setting, control: SettingControlSpec): void {
+		const key = control.key;
+		if (control.type === "dropdown") {
+			setting.addDropdown((dropdown) =>
+				dropdown
+					.addOptions(control.options)
+					.setValue(String(this.getControlValue(key) ?? ""))
+					.onChange((value) => void this.setControlValue(key, value))
+			);
+		} else if (control.type === "text") {
+			setting.addText((text) =>
+				text
+					.setPlaceholder(control.placeholder ?? "")
+					.setValue(String(this.getControlValue(key) ?? ""))
+					.onChange((value) => void this.setControlValue(key, value))
+			);
+		} else if (control.type === "toggle") {
+			setting.addToggle((toggle) =>
+				toggle
+					.setValue(Boolean(this.getControlValue(key)))
+					.onChange((value) => void this.setControlValue(key, value))
+			);
+		} else if (control.type === "slider") {
+			setting.addSlider((slider) =>
+				slider
+					.setLimits(control.min, control.max, control.step)
+					.setValue(Number(this.getControlValue(key)))
+					.setDynamicTooltip()
+					.onChange((value) => void this.setControlValue(key, value))
+			);
+		}
+		// Any other control type is skipped rather than blanking the whole pane.
+	}
+
 	getControlValue(key: string): unknown {
 		if (key === "excludeFolders") {
 			return this.plugin.settings.excludeFolders.join(", ");
@@ -473,3 +559,33 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
+
+/** Evaluate a declarative `visible` value (boolean or `() => boolean`). */
+function resolveVisible(visible: boolean | (() => boolean) | undefined): boolean {
+	if (visible === undefined) return true;
+	return typeof visible === "function" ? visible() : visible;
+}
+
+/**
+ * The subset of a declarative setting row the `display()` fallback reads. Kept
+ * local and minimal rather than reusing the full 1.13 `SettingDefinition` union,
+ * since the fallback only renders the fields this plugin's definitions set.
+ */
+type SettingDefinitionRow = {
+	name?: string;
+	desc?: string | DocumentFragment;
+	visible?: boolean | (() => boolean);
+	render?: (setting: Setting, group: never) => void;
+	control?: SettingControlSpec;
+};
+
+type SettingControlSpec =
+	| { type: "dropdown"; key: string; options: Record<string, string> }
+	| { type: "text"; key: string; placeholder?: string }
+	| { type: "toggle"; key: string }
+	| { type: "slider"; key: string; min: number; max: number; step: number };
+
+/** A top-level entry from `getSettingDefinitions()`: a group/list or a bare row. */
+type SettingDefinitionEntry =
+	| { type: "group" | "list"; heading?: string; items?: SettingDefinitionRow[] }
+	| ({ type?: undefined } & SettingDefinitionRow);
