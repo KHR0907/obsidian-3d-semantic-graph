@@ -1,5 +1,9 @@
 # Obsidian 3D Semantic Graph
 
+> Visualize your vault as a 3D semantic universe — notes that mean similar things cluster together.
+
+![3D semantic graph of a 753-note vault, colored by folder](docs/images/graph-overview.png)
+
 Desktop-only Obsidian plugin that visualizes your notes in an interactive 3D space. Notes are positioned using OpenAI or local Ollama embeddings projected into 3D via UMAP or PCA, so semantically related notes cluster together. Without embeddings, the plugin uses a folder-based clustered sphere layout with ConvexHull cluster regions.
 
 [Korean](./docs/README_KO.md)
@@ -22,6 +26,12 @@ Desktop-only Obsidian plugin that visualizes your notes in an interactive 3D spa
 - **Deterministic seeding** — same layout seed produces the same graph layout
 - **Embedding cache** — reuses unchanged note vectors to minimize API calls
 - **Folder exclusion** — skip specified folders from both graph and embedding generation
+
+## Screenshots
+
+Semantic clusters up close — each color is a top-level folder, and embedding-based layout pulls related topics together even across folders:
+
+![Semantic clusters up close](docs/images/graph-clusters.png)
 
 ## How It Works
 
