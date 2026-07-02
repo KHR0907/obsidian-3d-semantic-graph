@@ -4,8 +4,11 @@ import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js"
 import { getNodePath, GraphData, GraphLink, GraphNode, GraphVisualOptions } from "./types";
 import { ClusterRegion } from "./clustered-sphere-layout";
 
-const BASE_LINK_OPACITY = 0.2;
-const DIMMED_LINK_OPACITY = 0.03;
+// Effective on-screen color is base blended into the scene background, so the
+// visibility floor is set by color × opacity together. 0.2 sank links into the
+// background on both themes; 0.45 keeps them recessive but clearly legible.
+const BASE_LINK_OPACITY = 0.45;
+const DIMMED_LINK_OPACITY = 0.05;
 const HIGHLIGHT_LINK_OPACITY = 0.9;
 const DIMMED_NODE_OPACITY_FACTOR = 0.16;
 const AUTO_ROTATE_BASE_SPEED = 0.00028;
@@ -56,22 +59,25 @@ interface SceneThemePalette {
 	gridCenterColor: string;
 }
 
+// Grid/link colors are chosen for their BLENDED result against the background
+// (they render translucent): recessive enough not to compete with nodes, but
+// clearly separable from the backdrop on both themes.
 const SCENE_THEMES: Record<GraphVisualOptions["sceneTheme"], SceneThemePalette> = {
 	dark: {
 		background: "#0f172a",
-		baseLinkColor: "#94a3b8",
+		baseLinkColor: "#aebccd",
 		dimLinkColor: "#334155",
 		highlightLinkColor: "#f8fafc",
-		gridColor: "#334155",
-		gridCenterColor: "#cbd5e1",
+		gridColor: "#526075",
+		gridCenterColor: "#94a3b8",
 	},
 	light: {
 		background: "#f8fafc",
-		baseLinkColor: "#64748b",
+		baseLinkColor: "#526075",
 		dimLinkColor: "#cbd5e1",
 		highlightLinkColor: "#0f172a",
-		gridColor: "#cbd5e1",
-		gridCenterColor: "#334155",
+		gridColor: "#8e9cb0",
+		gridCenterColor: "#475569",
 	},
 };
 
@@ -477,7 +483,7 @@ export class GraphSceneRenderer {
 		const grid = new THREE.GridHelper(this.getGridSize(), this.getGridDivisions(), palette.gridCenterColor, palette.gridColor);
 		const gridMaterial = grid.material as THREE.Material & { opacity: number; transparent: boolean; depthWrite?: boolean };
 		gridMaterial.transparent = true;
-		gridMaterial.opacity = this.visualOptions.sceneTheme === "dark" ? 0.38 : 0.62;
+		gridMaterial.opacity = this.visualOptions.sceneTheme === "dark" ? 0.55 : 0.75;
 		gridMaterial.depthWrite = false;
 		grid.position.set(0, -1, 0);
 		grid.visible = this.visualOptions.showGrid;

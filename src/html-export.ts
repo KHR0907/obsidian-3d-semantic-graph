@@ -8,9 +8,11 @@ export interface GraphExportOptions {
 
 const FORCE_GRAPH_CDN = "https://unpkg.com/3d-force-graph@1.73.0/dist/3d-force-graph.min.js";
 
+// Link alphas match the live scene's blended-visibility floor (see SCENE_THEMES
+// in graph-scene-renderer.ts): recessive but clearly separable from the backdrop.
 const EXPORT_THEMES = {
-	dark: { background: "#0f172a", text: "#e2e8f0", link: "rgba(148, 163, 184, 0.4)" },
-	light: { background: "#f8fafc", text: "#0f172a", link: "rgba(100, 116, 139, 0.45)" },
+	dark: { background: "#0f172a", text: "#e2e8f0", link: "rgba(174, 188, 205, 0.5)" },
+	light: { background: "#f8fafc", text: "#0f172a", link: "rgba(82, 96, 117, 0.5)" },
 } as const;
 
 interface ExportNode {
