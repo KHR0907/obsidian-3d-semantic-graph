@@ -313,7 +313,9 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 							setting.addButton((button) =>
 								button
 									.setButtonText(t("settings.reset.button"))
-									.setDestructive()
+									// setWarning (@since 0.11.0) instead of setDestructive
+									// (@since 1.13.0) to stay within minAppVersion 1.11.0.
+									.setWarning()
 									.onClick(async () => {
 										const apiKey = this.plugin.settings.embeddingApiKey;
 										await this.replaceSettings({
