@@ -353,7 +353,7 @@ export class SemanticGraphView extends ItemView {
 
 			const blob = new Blob([html], { type: "text/html" });
 			const url = URL.createObjectURL(blob);
-			const anchor = activeDocument.createElement("a");
+			const anchor = activeDocument.createEl("a");
 			anchor.href = url;
 			anchor.download = "semantic-graph.html";
 			anchor.click();

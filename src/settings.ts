@@ -31,10 +31,19 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 	}
 
 	/**
+	 * 1.13 declarative-settings hook: lets Obsidian index this tab's settings
+	 * for the settings search. Harmless on older versions (never called there);
+	 * rendering itself always goes through {@link display}.
+	 */
+	getSettingDefinitions() {
+		return this.buildSettingDefinitions();
+	}
+
+	/**
 	 * Declarative description of the settings pane. This is the single source of
-	 * truth for {@link display}; it deliberately does not use the 1.13
-	 * `getSettingDefinitions()` name or `SettingDefinitionItem` type, so the
-	 * plugin stays within the API surface its declared `minAppVersion` supports.
+	 * truth for {@link display}; it deliberately avoids the 1.13
+	 * `SettingDefinitionItem` type so the plugin stays within the API surface
+	 * its declared `minAppVersion` supports.
 	 */
 	private buildSettingDefinitions(): SettingDefinitionEntry[] {
 		const settings = this.plugin.settings;
@@ -313,9 +322,9 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 							setting.addButton((button) =>
 								button
 									.setButtonText(t("settings.reset.button"))
-									// setWarning (@since 0.11.0) instead of setDestructive
-									// (@since 1.13.0) to stay within minAppVersion 1.11.0.
-									.setWarning()
+									// mod-warning class directly: setDestructive() is 1.13-only
+									// (above minAppVersion 1.11.0) and setWarning() is deprecated.
+									.then((b) => b.buttonEl.addClass("mod-warning"))
 									.onClick(async () => {
 										const apiKey = this.plugin.settings.embeddingApiKey;
 										await this.replaceSettings({
@@ -342,6 +351,15 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 	 * schema the plugin actually uses.
 	 */
 	display(): void {
+		this.renderPane();
+	}
+
+	/** Re-render the whole pane; called after structural setting changes. */
+	update(): void {
+		this.renderPane();
+	}
+
+	private renderPane(): void {
 		this.containerEl.empty();
 		for (const item of this.buildSettingDefinitions()) {
 			if (item.type === "group" || item.type === "list") {
@@ -353,13 +371,8 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 				}
 				continue;
 			}
-			this.renderDefinitionRow(item as SettingDefinitionRow);
+			this.renderDefinitionRow(item);
 		}
-	}
-
-	/** Re-render the whole pane; called after structural setting changes. */
-	update(): void {
-		this.display();
 	}
 
 	private renderDefinitionRow(def: SettingDefinitionRow): void {
@@ -372,7 +385,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 		if (typeof def.render === "function") {
 			// This plugin's render callbacks only use the Setting argument; the
 			// SettingGroup param is never read, so an undefined shim is safe.
-			def.render(setting, undefined as unknown as never);
+			def.render(setting, undefined);
 			return;
 		}
 
@@ -387,14 +400,14 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			setting.addDropdown((dropdown) =>
 				dropdown
 					.addOptions(control.options)
-					.setValue(String(this.getControlValue(key) ?? ""))
+					.setValue(controlText(this.getControlValue(key)))
 					.onChange((value) => void this.setControlValue(key, value))
 			);
 		} else if (control.type === "text") {
 			setting.addText((text) =>
 				text
 					.setPlaceholder(control.placeholder ?? "")
-					.setValue(String(this.getControlValue(key) ?? ""))
+					.setValue(controlText(this.getControlValue(key)))
 					.onChange((value) => void this.setControlValue(key, value))
 			);
 		} else if (control.type === "toggle") {
@@ -404,13 +417,18 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 					.onChange((value) => void this.setControlValue(key, value))
 			);
 		} else if (control.type === "slider") {
-			setting.addSlider((slider) =>
+			setting.addSlider((slider) => {
 				slider
 					.setLimits(control.min, control.max, control.step)
 					.setValue(Number(this.getControlValue(key)))
-					.setDynamicTooltip()
-					.onChange((value) => void this.setControlValue(key, value))
-			);
+					.onChange((value) => {
+						// Native tooltip as value feedback; on Obsidian < 1.13 the
+						// slider does not show its value inline.
+						slider.sliderEl.title = String(value);
+						void this.setControlValue(key, value);
+					});
+				slider.sliderEl.title = String(Number(this.getControlValue(key)));
+			});
 		}
 		// Any other control type is skipped rather than blanking the whole pane.
 	}
@@ -448,7 +466,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 			});
 			return;
 		}
-		await this.patchSettings({ [key]: value } as Partial<PluginSettings>);
+		await this.patchSettings({ [key]: value });
 	}
 
 	private async patchSettings(patch: Partial<PluginSettings>): Promise<void> {
@@ -465,7 +483,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 	}
 
 	private uploadVectorsJson(): void {
-		const input = activeDocument.createElement("input");
+		const input = activeDocument.createEl("input");
 		input.type = "file";
 		input.accept = "application/json,.json";
 		input.onchange = async () => {
@@ -538,7 +556,7 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 	private downloadJsonFile(fileName: string, raw: string): void {
 		const blob = new Blob([raw], { type: "application/json" });
 		const url = URL.createObjectURL(blob);
-		const anchor = activeDocument.createElement("a");
+		const anchor = activeDocument.createEl("a");
 		anchor.href = url;
 		anchor.download = fileName;
 		anchor.click();
@@ -564,6 +582,13 @@ function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
+/** Coerce a control value to display text without relying on Object stringification. */
+function controlText(value: unknown): string {
+	if (typeof value === "string") return value;
+	if (typeof value === "number" || typeof value === "boolean") return String(value);
+	return "";
+}
+
 /** Evaluate a declarative `visible` value (boolean or `() => boolean`). */
 function resolveVisible(visible: boolean | (() => boolean) | undefined): boolean {
 	if (visible === undefined) return true;
@@ -571,17 +596,31 @@ function resolveVisible(visible: boolean | (() => boolean) | undefined): boolean
 }
 
 /**
- * The subset of a declarative setting row the `display()` fallback reads. Kept
- * local and minimal rather than reusing the full 1.13 `SettingDefinition` union,
- * since the fallback only renders the fields this plugin's definitions set.
+ * The subset of the declarative setting schema this plugin uses. Kept local
+ * (structurally compatible with the 1.13 `SettingDefinitionItem` union, but
+ * without referencing 1.13-only type exports) so the source stays within the
+ * API surface of the declared `minAppVersion` while `getSettingDefinitions()`
+ * still satisfies the base-class signature on 1.13 typings.
  */
-type SettingDefinitionRow = {
-	name?: string;
+interface SettingRowBase {
+	name: string;
 	desc?: string | DocumentFragment;
 	visible?: boolean | (() => boolean);
-	render?: (setting: Setting, group: never) => void;
-	control?: SettingControlSpec;
-};
+}
+
+interface SettingRowControl extends SettingRowBase {
+	control: SettingControlSpec;
+	render?: never;
+	action?: never;
+}
+
+interface SettingRowRender extends SettingRowBase {
+	render: (setting: Setting, group: unknown) => void;
+	control?: never;
+	action?: never;
+}
+
+type SettingDefinitionRow = SettingRowControl | SettingRowRender;
 
 type SettingControlSpec =
 	| { type: "dropdown"; key: string; options: Record<string, string> }
@@ -591,5 +630,6 @@ type SettingControlSpec =
 
 /** A top-level entry from `buildSettingDefinitions()`: a group/list or a bare row. */
 type SettingDefinitionEntry =
-	| { type: "group" | "list"; heading?: string; items?: SettingDefinitionRow[] }
+	| { type: "group"; heading?: string; items?: SettingDefinitionRow[] }
+	| { type: "list"; heading?: string; items?: SettingDefinitionRow[] }
 	| ({ type?: undefined } & SettingDefinitionRow);

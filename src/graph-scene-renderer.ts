@@ -964,7 +964,10 @@ export class GraphSceneRenderer {
 	}
 
 	private getControls(): SceneControls | null {
-		return this.graph ? this.graph.controls() as SceneControls : null;
+		if (!this.graph) return null;
+		// controls() is untyped (any) in 3d-force-graph; launder through unknown.
+		const controls: unknown = this.graph.controls();
+		return controls as SceneControls;
 	}
 
 	private getGraphScene(): THREE.Scene {
