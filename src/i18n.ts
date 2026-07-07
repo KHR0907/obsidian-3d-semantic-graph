@@ -38,7 +38,7 @@ const STRINGS = {
 	"status.pcaProgress": { en: "PCA: {step}/{total}", ko: "PCA: {step}/{total}" },
 	"status.umap": { en: "Running UMAP...", ko: "UMAP 실행 중..." },
 	"status.umapProgress": { en: "UMAP: {epoch}/{total}", ko: "UMAP: {epoch}/{total}" },
-	"status.embedding": { en: "Generating embeddings...", ko: "임베딩 생성 중..." },
+	"status.embeddingCache": { en: "Checking embedding cache...", ko: "임베딩 캐시 확인 중..." },
 	"status.embeddingProgress": { en: "Embedding... {current}/{total}", ko: "임베딩 중... {current}/{total}" },
 	"status.loadingVectors": { en: "Loading uploaded vectors...", ko: "업로드된 벡터 불러오는 중..." },
 	"status.clusteredSphere": { en: "Using clustered sphere layout...", ko: "클러스터 구형 레이아웃 사용 중..." },

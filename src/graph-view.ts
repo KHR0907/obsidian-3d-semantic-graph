@@ -526,20 +526,43 @@ export class SemanticGraphView extends ItemView {
 
 			if (canGenerateEmbeddings(settings)) {
 				try {
-					const embeddings = settings.uploadedVectorsFileName.trim()
-						? await this.loadUploadedEmbeddingVectors()
-						: await this.loadProviderEmbeddings(settings);
+					let embeddings: Map<string, number[]>;
+					let layoutFingerprint: string | null = null;
+					if (settings.uploadedVectorsFileName.trim()) {
+						embeddings = await this.loadUploadedEmbeddingVectors();
+					} else {
+						const loaded = await this.loadProviderEmbeddings(settings);
+						embeddings = loaded.embeddings;
+						layoutFingerprint = loaded.layoutFingerprint;
+					}
 					if (!isCurrentRequest()) return;
 					loadedEmbeddings = embeddings;
 
 					if (embeddings.size >= 3) {
 						const paths = Array.from(embeddings.keys());
-						const vectors = paths.map((p) => embeddings.get(p)!);
-						const coords = await this.reduceEmbeddings(vectors, settings);
+						const { buildLayoutCacheKey, readLayoutCache, writeLayoutCache } = await import("./layout-cache");
+						if (!isCurrentRequest()) return;
+						const layoutKey = layoutFingerprint
+							? buildLayoutCacheKey(layoutFingerprint, settings)
+							: null;
+						let semanticPositions = layoutKey
+							? await readLayoutCache(this.app, this.pluginDir, layoutKey)
+							: null;
 						if (!isCurrentRequest()) return;
 
-						const semanticPositions = new Map<string, [number, number, number]>();
-						paths.forEach((p, i) => semanticPositions.set(p, coords[i] as [number, number, number]));
+						if (!semanticPositions) {
+							const vectors = paths.map((p) => embeddings.get(p)!);
+							const coords = await this.reduceEmbeddings(vectors, settings);
+							if (!isCurrentRequest()) return;
+
+							const computedPositions = new Map<string, [number, number, number]>();
+							paths.forEach((p, i) => computedPositions.set(p, coords[i] as [number, number, number]));
+							semanticPositions = computedPositions;
+							if (layoutKey) {
+								await writeLayoutCache(this.app, this.pluginDir, layoutKey, computedPositions);
+								if (!isCurrentRequest()) return;
+							}
+						}
 
 						finalPositions = this.createSemanticLayout(
 								graphData.nodes,
@@ -627,13 +650,18 @@ export class SemanticGraphView extends ItemView {
 		}
 	}
 
-	private async loadProviderEmbeddings(settings: PluginSettings): Promise<Map<string, number[]>> {
-		this.setStatus(t("status.embedding"));
+	private async loadProviderEmbeddings(
+		settings: PluginSettings
+	): Promise<{ embeddings: Map<string, number[]>; layoutFingerprint: string }> {
+		this.setStatus(t("status.embeddingCache"));
 		const { EmbeddingService } = await import("./embedding");
 		const embeddingService = new EmbeddingService(this.app, settings, this.pluginDir);
-		return embeddingService.getEmbeddings((current, total) => {
-			this.setStatus(t("status.embeddingProgress", { current, total }));
+		const embeddings = await embeddingService.getEmbeddings((current, total) => {
+			if (current < total) {
+				this.setStatus(t("status.embeddingProgress", { current, total }));
+			}
 		});
+		return { embeddings, layoutFingerprint: embeddingService.getFingerprintFor(embeddings.keys()) };
 	}
 
 	private async loadUploadedEmbeddingVectors(): Promise<Map<string, number[]>> {

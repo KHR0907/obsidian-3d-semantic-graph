@@ -122,6 +122,20 @@ export class EmbeddingService {
 		return result;
 	}
 
+	/**
+	 * Stable fingerprint of the cached content hashes for the given paths.
+	 * Call after getEmbeddings() so the in-memory entries are up to date.
+	 */
+	getFingerprintFor(paths: Iterable<string>): string {
+		const parts: string[] = [];
+		for (const path of paths) {
+			const entry = this.cache.entries[path];
+			parts.push(`${path}:${entry ? entry.contentHash : ""}`);
+		}
+		parts.sort();
+		return this.hashContent(`${this.cache.modelId}|${parts.join("|")}`);
+	}
+
 	private getEligibleFiles(): TFile[] {
 		return this.app.vault.getMarkdownFiles().filter((file) => {
 			return !isPathExcluded(file.path, this.settings.excludeFolders);
