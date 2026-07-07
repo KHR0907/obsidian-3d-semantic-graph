@@ -239,6 +239,11 @@ const STRINGS = {
 		en: "Adjust the idle camera orbit speed. Set to 0 to disable automatic camera movement. Default: 0.2.",
 		ko: "유휴 상태의 카메라 자동 회전 속도입니다. 0이면 비활성화. 기본값: 0.2.",
 	},
+	"settings.entryAnimation.name": { en: "Entry animation", ko: "진입 애니메이션" },
+	"settings.entryAnimation.desc": {
+		en: "Play an expand-and-fly-in animation when the graph opens. Default: on.",
+		ko: "그래프를 열 때 노드 확산과 카메라 진입 애니메이션을 재생합니다. 기본값: 켬.",
+	},
 	"settings.suggestedLinks.name": { en: "Suggested links", ko: "링크 제안 개수" },
 	"settings.suggestedLinks.desc": {
 		en: "Maximum number of suggested links shown in the insights panel. Default: 20.",
