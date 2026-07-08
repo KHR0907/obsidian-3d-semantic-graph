@@ -29,7 +29,6 @@ export interface PluginSettings {
 	nodeSizeScale: number;
 	dragSensitivity: number;
 	autoOrbitSpeed: number;
-	entryAnimation: boolean;
 	layoutSeed: number;
 	excludeFolders: string[];
 }
@@ -61,7 +60,6 @@ export function createDefaultSettings(): PluginSettings {
 		nodeSizeScale: 1.5,
 		dragSensitivity: 1,
 		autoOrbitSpeed: 0.2,
-		entryAnimation: true,
 		layoutSeed: generateRandomLayoutSeed(),
 		excludeFolders: [],
 	};
@@ -136,7 +134,6 @@ export interface GraphVisualOptions {
 	dragSensitivity: number;
 	showGrid: boolean;
 	autoOrbitSpeed: number;
-	entryAnimation: boolean;
 	sceneExtent: number;
 }
 
