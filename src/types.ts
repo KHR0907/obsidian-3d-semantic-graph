@@ -24,6 +24,7 @@ export interface PluginSettings {
 	showLinks: boolean;
 	showGrid: boolean;
 	showClusters: "on" | "hover" | "off";
+	clusterSource: "semantic" | "folder";
 	sceneTheme: SceneThemeSetting;
 	nodeOpacity: number;
 	nodeSizeScale: number;
@@ -56,6 +57,7 @@ export function createDefaultSettings(): PluginSettings {
 		showLinks: false,
 		showGrid: true,
 		showClusters: "hover",
+		clusterSource: "semantic",
 		sceneTheme: "auto",
 		nodeOpacity: 1,
 		nodeSizeScale: 1.5,
@@ -158,6 +160,7 @@ export interface GraphNode {
 	path: string;
 	color: string;
 	size: number;
+	tags?: string[];
 	ctime?: number;
 	x?: number;
 	y?: number;

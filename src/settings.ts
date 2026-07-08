@@ -224,6 +224,18 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 						control: { type: "toggle", key: "showGrid" },
 					},
 					{
+						name: t("settings.clusterSource.name"),
+						desc: t("settings.clusterSource.desc"),
+						control: {
+							type: "dropdown",
+							key: "clusterSource",
+							options: {
+								semantic: t("settings.clusterSource.semantic"),
+								folder: t("settings.clusterSource.folder"),
+							},
+						},
+					},
+					{
 						name: t("settings.timelineSource.name"),
 						desc: t("settings.timelineSource.desc"),
 						control: {

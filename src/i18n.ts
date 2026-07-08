@@ -214,6 +214,13 @@ const STRINGS = {
 		en: "Display a solid square grid on the ground plane. Default: on.",
 		ko: "바닥 평면에 그리드를 표시합니다. 기본값: 켬.",
 	},
+	"settings.clusterSource.name": { en: "Cluster grouping", ko: "클러스터 기준" },
+	"settings.clusterSource.desc": {
+		en: "How cluster regions are grouped. Semantic groups notes by embedding similarity with auto-generated topic labels; Folder groups by folder structure. Default: semantic.",
+		ko: "클러스터 영역의 그룹 기준입니다. 시맨틱은 임베딩 유사도로 묶고 주제 라벨을 자동 생성하며, 폴더는 폴더 구조로 묶습니다. 기본값: 시맨틱.",
+	},
+	"settings.clusterSource.semantic": { en: "Semantic (auto-labeled)", ko: "시맨틱 (자동 라벨)" },
+	"settings.clusterSource.folder": { en: "Folder", ko: "폴더" },
 
 	// Settings — appearance
 	"settings.appearance.heading": { en: "Appearance", ko: "외관" },

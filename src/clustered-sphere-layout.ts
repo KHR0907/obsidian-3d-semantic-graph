@@ -5,7 +5,10 @@ export interface ClusterRegion {
 	points: [number, number, number][];
 	nodePaths: string[];
 	color: string;
+	/** Display label: a folder path for folder regions, a topic label for semantic ones. */
 	folder: string;
+	/** MOC target folder when `folder` is not a real path ("" = vault root). */
+	mocFolder?: string;
 }
 
 export interface ClusteredSphereResult {

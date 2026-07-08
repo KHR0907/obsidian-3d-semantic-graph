@@ -325,8 +325,18 @@ export class InsightsPanel {
 	private async createMoc(region: ClusterRegion, button: HTMLButtonElement): Promise<void> {
 		try {
 			button.disabled = true;
-			const folderName = region.folder === "/" ? "Vault" : region.folder.split("/").pop() ?? region.folder;
-			const basePath = region.folder === "/" ? "" : `${region.folder}/`;
+			// Semantic regions carry a topic label in `folder` (not a real path)
+			// and an explicit mocFolder target instead.
+			const isRealFolder = region.mocFolder === undefined;
+			const rawName = region.folder === "/"
+				? "Vault"
+				: isRealFolder
+					? region.folder.split("/").pop() ?? region.folder
+					: region.folder;
+			const folderName = rawName.replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").trim() || "Cluster";
+			const basePath = isRealFolder
+				? region.folder === "/" ? "" : `${region.folder}/`
+				: region.mocFolder ? `${region.mocFolder}/` : "";
 
 			let mocPath = `${basePath}MOC - ${folderName}.md`;
 			let suffix = 1;

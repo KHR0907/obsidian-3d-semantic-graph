@@ -3,6 +3,7 @@ import { canGenerateEmbeddings, clonePluginSettings, GraphData, GraphNode, Graph
 import { createSeededRandom } from "./seeded-rng";
 import { buildGraphData } from "./graph-data";
 import { createClusteredSphereLayout, buildClusterRegions } from "./clustered-sphere-layout";
+import { SemanticCluster, buildSemanticClusterRegions, computeSemanticClusters } from "./semantic-clusters";
 import { InsightsPanel } from "./insights-panel";
 import { SuggestedLink } from "./insights";
 import { SuggestionSegment } from "./graph-scene-renderer";
@@ -241,7 +242,8 @@ export class SemanticGraphView extends ItemView {
 		if (
 			previous.projectionMethod !== settings.projectionMethod ||
 			previous.layoutSeed !== settings.layoutSeed ||
-			previous.timelineDateSource !== settings.timelineDateSource
+			previous.timelineDateSource !== settings.timelineDateSource ||
+			previous.clusterSource !== settings.clusterSource
 		) {
 			void this.loadGraph();
 		}
@@ -526,6 +528,7 @@ export class SemanticGraphView extends ItemView {
 			const spherePositions = this.createSphereLayout(graphData.nodes, layoutRadius, settings);
 			let finalPositions = spherePositions;
 			let clusterResult: import("./clustered-sphere-layout").ClusteredSphereResult | null = null;
+			let semanticClusters: SemanticCluster[] | null = null;
 
 			if (canGenerateEmbeddings(settings)) {
 				try {
@@ -541,17 +544,22 @@ export class SemanticGraphView extends ItemView {
 						const quick = await service.checkVaultFingerprint();
 						if (!isCurrentRequest()) return;
 						if (quick?.upToDate) {
-							semanticPositions = await readLayoutCache(
+							const cachedLayout = await readLayoutCache(
 								this.app,
 								this.pluginDir,
 								buildLayoutCacheKey(quick.fingerprint, settings)
 							);
 							if (!isCurrentRequest()) return;
+							if (cachedLayout) {
+								semanticPositions = cachedLayout.coords;
+								semanticClusters = cachedLayout.clusters;
+							}
 						}
 					}
 
 					if (!semanticPositions || semanticPositions.size < 3) {
 						semanticPositions = null;
+						semanticClusters = null;
 						let embeddings: Map<string, number[]>;
 						let layoutFingerprint: string | null = null;
 						if (settings.uploadedVectorsFileName.trim()) {
@@ -569,12 +577,15 @@ export class SemanticGraphView extends ItemView {
 							const layoutKey = layoutFingerprint
 								? buildLayoutCacheKey(layoutFingerprint, settings)
 								: null;
-							semanticPositions = layoutKey
+							const cachedLayout = layoutKey
 								? await readLayoutCache(this.app, this.pluginDir, layoutKey)
 								: null;
 							if (!isCurrentRequest()) return;
 
-							if (!semanticPositions) {
+							if (cachedLayout) {
+								semanticPositions = cachedLayout.coords;
+								semanticClusters = cachedLayout.clusters;
+							} else {
 								const vectors = paths.map((p) => embeddings.get(p)!);
 								const coords = await this.reduceEmbeddings(vectors, settings);
 								if (!isCurrentRequest()) return;
@@ -582,8 +593,16 @@ export class SemanticGraphView extends ItemView {
 								const computedPositions = new Map<string, [number, number, number]>();
 								paths.forEach((p, i) => computedPositions.set(p, coords[i] as [number, number, number]));
 								semanticPositions = computedPositions;
+
+								const notesMeta = new Map(
+									graphData.nodes.map((node) => [
+										node.path,
+										{ path: node.path, name: node.name, tags: node.tags ?? [] },
+									])
+								);
+								semanticClusters = computeSemanticClusters(embeddings, notesMeta, settings.layoutSeed);
 								if (layoutKey) {
-									await writeLayoutCache(this.app, this.pluginDir, layoutKey, computedPositions);
+									await writeLayoutCache(this.app, this.pluginDir, layoutKey, computedPositions, semanticClusters);
 									if (!isCurrentRequest()) return;
 								}
 							}
@@ -653,7 +672,9 @@ export class SemanticGraphView extends ItemView {
 			this.renderer.setLinksVisible(settings.showLinks);
 			const regions = clusterResult
 				? clusterResult.regions
-				: buildClusterRegions(graphData.nodes);
+				: settings.clusterSource === "semantic" && semanticClusters && semanticClusters.length > 0
+					? buildSemanticClusterRegions(graphData.nodes, semanticClusters)
+					: buildClusterRegions(graphData.nodes);
 			this.renderer.setClusterRegions(regions);
 			this.renderer.setClustersMode(this.getClustersMode(settings));
 
