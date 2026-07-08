@@ -11,19 +11,23 @@ Desktop-only Obsidian plugin that visualizes your notes in an interactive 3D spa
 ## Features
 
 - **Semantic 3D layout** — OpenAI or Ollama embeddings reduced to 3D coordinates via UMAP or PCA
+- **Semantic search** — search by meaning from the toolbar; the top matches are highlighted in the graph and the camera flies to the best one
+- **Auto-labeled semantic clusters** — cluster regions grouped by embedding similarity (k-means) with topic labels generated from note titles and tags (e.g. "space · astronomy · telescope"); switchable back to folder grouping
 - **Local embeddings (Ollama)** — run fully offline with a local Ollama server, no API key required
-- **Insights panel** — suggested links (semantically close but unlinked note pairs, drawn as dashed lines and insertable with one click), potential duplicates, orphan notes, and per-cluster MOC (Map of Content) generation
+- **Insights panel** — suggested links (semantically close but unlinked note pairs, ranked by cosine similarity plus shared-tag / same-folder / co-link signals, drawn as dashed lines and insertable with one click), potential duplicates, orphan notes, and per-cluster MOC (Map of Content) generation
 - **Semantic neighbors sidebar** — a mini 3D view plus ranked list of the active note's nearest semantic neighbors
 - **Timeline playback** — replay your vault's growth over time by note creation date (file created time by default; optionally frontmatter `created` / `date created`)
 - **Interactive HTML export** — download the current graph as a standalone HTML file with deep links back into your vault
 - **Korean and English UI** — language setting (auto / English / 한국어); auto follows the Obsidian app language
 - **Clustered sphere fallback** — folder-based clustered layout with color-coded groups when no embeddings are available
-- **ConvexHull cluster regions** — translucent 3D hulls that outline folder clusters (toggle: On / Hover / Off)
+- **ConvexHull cluster regions** — translucent 3D hulls that outline semantic or folder clusters (toggle: On / Hover / Off)
 - **Note links** — real links from Obsidian's resolved references, togglable from the toolbar
 - **Node coloring** — by folder or first tag
 - **Uploaded vectors** — import/export custom vector JSON files as an alternative to API-generated embeddings
+- **Entry animation** — nodes expand from the center and the camera flies in when the graph opens (toggle in settings; respects OS reduced-motion)
 - **Appearance controls** — light/dark theme, grid, auto orbit, node size, opacity, drag sensitivity
 - **Deterministic seeding** — same layout seed produces the same graph layout
+- **Instant reopen** — content hashes and computed layouts are cached, so reopening an unchanged vault skips both re-embedding and UMAP/PCA and renders in well under a second
 - **Embedding cache** — reuses unchanged note vectors to minimize API calls
 - **Folder exclusion** — skip specified folders from both graph and embedding generation
 
@@ -85,6 +89,7 @@ npm run build  # production build
 3. **Toolbar controls:**
    - **Refresh** — rebuild the graph
    - **Reset Camera** — return to the default camera angle
+   - **Search** — semantic search; Enter highlights the top matches and flies to the best one, click a result to fly to it, double-click to open the note, Esc to clear
    - **Links** — toggle link visibility
    - **Grid** — toggle XZ grid
    - **Clusters** — cycle cluster regions mode (On → Hover → Off)
@@ -113,19 +118,24 @@ npm run build  # production build
 | Show Links | Display link lines between notes | Off |
 | Show Grid | Display XZ grid plane | On |
 | Show Clusters | ConvexHull cluster region visibility | `hover` |
+| Cluster Grouping | Group cluster regions semantically (auto-labeled) or by folder | `semantic` |
 | Scene Theme | Auto (match app theme), dark, or light background | `auto` |
 | Node Opacity | Node transparency (0.15–1.0) | `1.0` |
 | Node Size | Node size multiplier (0.4–2.0) | `1.5` |
 | Drag Sensitivity | Camera rotation sensitivity (0.2–3.0) | `1.0` |
 | Auto Orbit Speed | Idle camera rotation speed (0 to disable) | `0.2` |
+| Entry Animation | Expand-and-fly-in animation when the graph opens | On |
 | Exclude Folders | Comma-separated folders to exclude | Empty |
 | Number of Neighbors | UMAP local/global balance (5–50) | `40` |
 | Minimum Distance | UMAP clustering tightness (0–0.99) | `0.80` |
 
-## Embedding Cache
+## Caching
 
-- Stored as `embeddings-cache.json` in the plugin directory
-- Automatically invalidated when the model or note content changes
+- `embeddings-cache.json` — note vectors; automatically invalidated when the model or note content changes
+- `embeddings-hashes.json` — lightweight content-hash index used to validate the vault without parsing the full vector cache
+- `layout-cache.json` — computed 3D coordinates and semantic clusters; reused when nothing changed so reopening skips UMAP/PCA entirely
+
+All three live in the plugin directory and rebuild automatically when stale.
 
 ## Tech Stack
 
