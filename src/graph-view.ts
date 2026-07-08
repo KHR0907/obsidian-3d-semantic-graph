@@ -54,6 +54,10 @@ export class SemanticGraphView extends ItemView {
 	private loadRequestId = 0;
 	private loadedEmbeddings: Map<string, number[]> | null = null;
 	private embeddingsFetchPromise: Promise<Map<string, number[]> | null> | null = null;
+	private searchBtn: HTMLButtonElement | null = null;
+	private searchInput: HTMLInputElement | null = null;
+	private searchResultsEl: HTMLElement | null = null;
+	private searchRequestId = 0;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -103,6 +107,29 @@ export class SemanticGraphView extends ItemView {
 		setIcon(resetRotateIcon, "rotate-ccw");
 		this.setToolbarTooltip(resetViewBtn, t("toolbar.resetView"));
 		resetViewBtn.addEventListener("click", () => this.renderer?.resetView());
+
+		this.searchBtn = this.toolbar.createEl("button", {
+			cls: "semantic-graph-btn semantic-graph-icon-btn",
+			attr: {
+				type: "button",
+				"aria-label": t("toolbar.searchAria"),
+			},
+		});
+		setIcon(this.searchBtn, "search");
+		this.setToolbarTooltip(this.searchBtn, t("toolbar.search"));
+		this.searchBtn.addEventListener("click", () => this.toggleSearch());
+		this.searchInput = this.toolbar.createEl("input", {
+			cls: "semantic-graph-search-input",
+			attr: { type: "text", placeholder: t("search.placeholder") },
+		});
+		this.searchInput.hide();
+		this.searchInput.addEventListener("keydown", (event) => {
+			if (event.key === "Enter") {
+				void this.runSemanticSearch(this.searchInput?.value ?? "");
+			} else if (event.key === "Escape") {
+				this.closeSearch();
+			}
+		});
 
 		this.linksToggleBtn = this.toolbar.createEl("button", {
 			cls: "semantic-graph-btn semantic-graph-icon-btn",
@@ -512,6 +539,7 @@ export class SemanticGraphView extends ItemView {
 		const isCurrentRequest = () => requestId === this.loadRequestId;
 		this.loadedEmbeddings = null;
 		this.embeddingsFetchPromise = null;
+		this.closeSearch();
 
 		try {
 			this.setStatus(t("status.building"));
@@ -696,6 +724,108 @@ export class SemanticGraphView extends ItemView {
 			const msg = err instanceof Error ? err.message : String(err);
 			this.showError(t("error.generic", { message: msg }));
 			new Notice(t("notice.graphError", { message: msg }));
+		}
+	}
+
+	private toggleSearch(): void {
+		if (!this.searchInput) return;
+		if (this.searchInput.isShown()) {
+			this.closeSearch();
+		} else {
+			this.searchInput.show();
+			this.searchBtn?.classList.add("is-active");
+			this.searchInput.focus();
+		}
+	}
+
+	private closeSearch(): void {
+		this.searchRequestId++;
+		this.searchInput?.hide();
+		if (this.searchInput) this.searchInput.value = "";
+		this.searchBtn?.classList.remove("is-active");
+		this.clearSearchResults();
+		this.renderer?.setSearchHighlight(null);
+	}
+
+	private clearSearchResults(): void {
+		this.searchResultsEl?.remove();
+		this.searchResultsEl = null;
+	}
+
+	private getSearchResultsEl(): HTMLElement | null {
+		if (!this.graphContainer) return null;
+		if (!this.searchResultsEl) {
+			this.searchResultsEl = this.graphContainer.createDiv({ cls: "semantic-graph-search-results" });
+		}
+		return this.searchResultsEl;
+	}
+
+	private async runSemanticSearch(query: string): Promise<void> {
+		const trimmed = query.trim();
+		if (!trimmed || !this.lastGraphData) return;
+		const settings = clonePluginSettings(this.settings);
+		if (!canGenerateEmbeddings(settings)) {
+			new Notice(t("insights.requiresEmbeddingsShort"));
+			return;
+		}
+
+		const requestId = ++this.searchRequestId;
+		const resultsEl = this.getSearchResultsEl();
+		resultsEl?.empty();
+		resultsEl?.createDiv({ cls: "semantic-graph-insights-hint", text: t("search.searching") });
+
+		try {
+			const embeddings = await this.getEmbeddingsLazy(settings);
+			if (requestId !== this.searchRequestId) return;
+			if (!embeddings || embeddings.size === 0) {
+				new Notice(t("insights.requiresEmbeddingsShort"));
+				this.clearSearchResults();
+				return;
+			}
+
+			const { createEmbeddingProviderAdapter } = await import("./embedding-adapters");
+			const adapter = createEmbeddingProviderAdapter(settings);
+			const [queryVector] = await adapter.embed([trimmed]);
+			if (requestId !== this.searchRequestId) return;
+
+			const { cosineSimilarity } = await import("./insights");
+			const nodePaths = new Set(this.lastGraphData.nodes.map((node) => node.path));
+			const scored: { path: string; similarity: number }[] = [];
+			for (const [path, vector] of embeddings) {
+				if (!nodePaths.has(path)) continue;
+				scored.push({ path, similarity: cosineSimilarity(queryVector, vector) });
+			}
+			scored.sort((a, b) => b.similarity - a.similarity);
+			const top = scored.slice(0, 10);
+
+			this.renderSearchResults(top);
+			this.renderer?.setSearchHighlight(top.map((result) => result.path));
+			if (top.length > 0) {
+				this.renderer?.flyToNode(top[0].path);
+			}
+		} catch (error) {
+			if (requestId !== this.searchRequestId) return;
+			new Notice(t("search.failed", { message: error instanceof Error ? error.message : String(error) }));
+			this.clearSearchResults();
+		}
+	}
+
+	private renderSearchResults(results: { path: string; similarity: number }[]): void {
+		const resultsEl = this.getSearchResultsEl();
+		if (!resultsEl) return;
+		resultsEl.empty();
+		if (results.length === 0) {
+			resultsEl.createDiv({ cls: "semantic-graph-insights-hint", text: t("search.noResults") });
+			return;
+		}
+		for (const result of results) {
+			const row = resultsEl.createDiv({ cls: "semantic-graph-search-result" });
+			const name = result.path.split("/").pop()?.replace(/\.md$/, "") ?? result.path;
+			row.createSpan({ cls: "semantic-graph-search-result-name", text: name });
+			row.createSpan({ cls: "semantic-graph-insights-score", text: `${Math.round(result.similarity * 100)}%` });
+			row.setAttribute("title", result.path);
+			row.addEventListener("click", () => this.renderer?.flyToNode(result.path));
+			row.addEventListener("dblclick", () => this.openNote(result.path));
 		}
 	}
 

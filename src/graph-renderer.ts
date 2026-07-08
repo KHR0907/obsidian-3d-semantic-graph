@@ -46,6 +46,14 @@ export class GraphRenderer {
 		this.sceneRenderer.resetView();
 	}
 
+	setSearchHighlight(paths: string[] | null): void {
+		this.sceneRenderer.setSearchHighlight(paths);
+	}
+
+	flyToNode(path: string): void {
+		this.sceneRenderer.flyToNode(path);
+	}
+
 	setClusterRegions(regions: ClusterRegion[]): void {
 		this.sceneRenderer.setClusterRegions(regions);
 	}

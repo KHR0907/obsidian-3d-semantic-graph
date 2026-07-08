@@ -20,6 +20,9 @@ const SUGGESTION_LINK_COLOR = "#f59e0b";
 const SUGGESTION_LINK_OPACITY = 0.85;
 const MIN_GRID_DIVISIONS = 24;
 const RESET_VIEW_DURATION_MS = 1000;
+const FLY_TO_DURATION_MS = 800;
+const FLY_TO_MIN_DISTANCE = 180;
+const FLY_TO_MAX_DISTANCE = 420;
 const ENTRY_ANIMATION_DURATION_MS = 1400;
 const ENTRY_START_SCALE = 0.04;
 const ENTRY_CAMERA_DISTANCE_RATIO = 1.7;
@@ -97,6 +100,7 @@ export class GraphSceneRenderer {
 	private adjacency = new Map<string, Set<string>>();
 	private selectedNodePath: string | null = null;
 	private highlightedNodes = new Set<string>();
+	private searchHighlight: Set<string> | null = null;
 	private visualOptions: GraphVisualOptions;
 	private helperObjects: THREE.Object3D[] = [];
 	private axesHelper: THREE.AxesHelper | null = null;
@@ -172,6 +176,7 @@ export class GraphSceneRenderer {
 
 	render(data: GraphData): void {
 		this.disposeGraph();
+		this.searchHighlight = null;
 		this.currentData = data;
 		this.adjacency = this.buildAdjacency(data);
 		this.ctimeByPath.clear();
@@ -401,12 +406,40 @@ export class GraphSceneRenderer {
 		return adjacency;
 	}
 
+	/** Dim everything except the given paths (e.g. semantic search results). */
+	setSearchHighlight(paths: string[] | null): void {
+		this.searchHighlight = paths && paths.length > 0 ? new Set(paths) : null;
+		this.syncNodeAppearance();
+		this.graph?.refresh();
+	}
+
+	/** Animate the camera to frame the given node, keeping the current approach direction. */
+	flyToNode(path: string): void {
+		if (!this.graph || !this.currentData) return;
+		const node = this.currentData.nodes.find((n) => n.path === path);
+		if (!node || node.x == null || node.y == null || node.z == null) return;
+		const current = this.getCurrentCameraState();
+		if (!current) return;
+
+		this.hasUserInteracted = true;
+		this.stopEntryScaleAnimation();
+		this.stopResetViewAnimation();
+		this.stopAutoRotate();
+
+		const target = new THREE.Vector3(node.x, node.y, node.z);
+		const offset = current.position.clone().sub(current.target);
+		const distance = Math.max(FLY_TO_MIN_DISTANCE, Math.min(FLY_TO_MAX_DISTANCE, offset.length() * 0.25));
+		const position = target.clone().add(offset.normalize().multiplyScalar(distance));
+		this.animateCameraViewState(current, { position, target, up: INITIAL_CAMERA_UP.clone() }, FLY_TO_DURATION_MS, true);
+	}
+
 	private handleNodeClick(node: GraphNode, event?: MouseEvent): void {
 		if (event?.shiftKey) {
 			this.onNodeOpen(node);
 			return;
 		}
 
+		this.searchHighlight = null;
 		this.selectedNodePath = node.path;
 		this.highlightedNodes = new Set(this.adjacency.get(node.path) ?? [node.path]);
 		this.syncNodeAppearance();
@@ -1001,22 +1034,33 @@ export class GraphSceneRenderer {
 		});
 	}
 
+	/** Search highlight takes precedence over click-selection highlighting. */
+	private getActiveHighlight(): Set<string> | null {
+		if (this.searchHighlight) return this.searchHighlight;
+		return this.selectedNodePath ? this.highlightedNodes : null;
+	}
+
 	private getNodeColor(path: string, baseColor: string): string {
-		if (!this.selectedNodePath) return baseColor;
-		return this.highlightedNodes.has(path)
+		const highlight = this.getActiveHighlight();
+		if (!highlight) return baseColor;
+		return highlight.has(path)
 			? baseColor
 			: this.mixColor(baseColor, this.visualOptions.sceneTheme === "dark" ? "#182338" : "#dbe4ef", 0.76);
 	}
 
 	private getNodeOpacity(path: string): number {
-		if (!this.selectedNodePath) return this.visualOptions.nodeOpacity;
-		return this.highlightedNodes.has(path)
+		const highlight = this.getActiveHighlight();
+		if (!highlight) return this.visualOptions.nodeOpacity;
+		return highlight.has(path)
 			? this.visualOptions.nodeOpacity
 			: Math.max(0.04, this.visualOptions.nodeOpacity * DIMMED_NODE_OPACITY_FACTOR);
 	}
 
 	private getLinkColor(link: GraphLink): string {
 		const palette = this.getPalette();
+		if (this.searchHighlight) {
+			return this.withAlpha(palette.dimLinkColor, DIMMED_LINK_OPACITY);
+		}
 		if (!this.selectedNodePath) {
 			return this.withAlpha(palette.baseLinkColor, BASE_LINK_OPACITY);
 		}
