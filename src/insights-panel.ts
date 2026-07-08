@@ -12,7 +12,8 @@ import { t } from "./i18n";
 
 export interface InsightsPanelData {
 	graphData: GraphData;
-	embeddings: Map<string, number[]> | null;
+	/** Lazy vector source — resolved only when the panel actually computes. */
+	getEmbeddings: () => Promise<Map<string, number[]> | null>;
 	regions: ClusterRegion[];
 	maxSuggestions: number;
 }
@@ -36,6 +37,7 @@ export class InsightsPanel {
 	private bodyEl: HTMLElement;
 	private data: InsightsPanelData | null = null;
 	private computed: ComputedInsights | null = null;
+	private fetchedEmbeddings: Map<string, number[]> | null = null;
 	private open = false;
 	private computeRequestId = 0;
 	private computingStatusEl: HTMLElement | null = null;
@@ -62,6 +64,7 @@ export class InsightsPanel {
 	setData(data: InsightsPanelData): void {
 		this.data = data;
 		this.computed = null;
+		this.fetchedEmbeddings = null;
 		if (this.open) {
 			this.computeAndRender();
 		}
@@ -115,14 +118,18 @@ export class InsightsPanel {
 	private async runComputation(): Promise<void> {
 		if (!this.data) return;
 		const requestId = ++this.computeRequestId;
-		const { graphData, embeddings, maxSuggestions } = this.data;
+		const { graphData, getEmbeddings, maxSuggestions } = this.data;
 
 		const orphans = computeOrphans(graphData.nodes, graphData.links);
 		let suggestions: SuggestedLink[] = [];
 		let duplicates: DuplicatePair[] = [];
 
+		this.showComputing();
+		const embeddings = await getEmbeddings();
+		if (requestId !== this.computeRequestId) return;
+		this.fetchedEmbeddings = embeddings;
+
 		if (embeddings && embeddings.size >= 2 && embeddings.size <= MAX_PAIRWISE_NODES) {
-			this.showComputing();
 			const result = await computePairInsights(embeddings, graphData.links, maxSuggestions, {
 				onProgress: (done, total) => {
 					if (requestId === this.computeRequestId && total > 0) {
@@ -158,7 +165,8 @@ export class InsightsPanel {
 		this.bodyEl.empty();
 		if (!this.data || !this.computed) return;
 
-		const { embeddings, regions } = this.data;
+		const { regions } = this.data;
+		const embeddings = this.fetchedEmbeddings;
 		const { suggestions, duplicates, orphans } = this.computed;
 		const tooManyNotes = embeddings !== null && embeddings.size > MAX_PAIRWISE_NODES;
 

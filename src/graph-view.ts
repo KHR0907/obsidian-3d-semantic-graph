@@ -51,6 +51,8 @@ export class SemanticGraphView extends ItemView {
 	private timelinePlaying = false;
 	private timelineFrame: number | null = null;
 	private loadRequestId = 0;
+	private loadedEmbeddings: Map<string, number[]> | null = null;
+	private embeddingsFetchPromise: Promise<Map<string, number[]> | null> | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -506,6 +508,8 @@ export class SemanticGraphView extends ItemView {
 		const settings = clonePluginSettings(this.settings);
 		const requestId = ++this.loadRequestId;
 		const isCurrentRequest = () => requestId === this.loadRequestId;
+		this.loadedEmbeddings = null;
+		this.embeddingsFetchPromise = null;
 
 		try {
 			this.setStatus(t("status.building"));
@@ -522,48 +526,71 @@ export class SemanticGraphView extends ItemView {
 			const spherePositions = this.createSphereLayout(graphData.nodes, layoutRadius, settings);
 			let finalPositions = spherePositions;
 			let clusterResult: import("./clustered-sphere-layout").ClusteredSphereResult | null = null;
-			let loadedEmbeddings: Map<string, number[]> | null = null;
 
 			if (canGenerateEmbeddings(settings)) {
 				try {
-					let embeddings: Map<string, number[]>;
-					let layoutFingerprint: string | null = null;
-					if (settings.uploadedVectorsFileName.trim()) {
-						embeddings = await this.loadUploadedEmbeddingVectors();
-					} else {
-						const loaded = await this.loadProviderEmbeddings(settings);
-						embeddings = loaded.embeddings;
-						layoutFingerprint = loaded.layoutFingerprint;
+					const { buildLayoutCacheKey, readLayoutCache, writeLayoutCache } = await import("./layout-cache");
+					let semanticPositions: Map<string, [number, number, number]> | null = null;
+
+					// Fast path: validate the vault against the lightweight hash file
+					// and reuse the cached layout without loading any vectors.
+					if (!settings.uploadedVectorsFileName.trim()) {
+						this.setStatus(t("status.embeddingCache"));
+						const { EmbeddingService } = await import("./embedding");
+						const service = new EmbeddingService(this.app, settings, this.pluginDir);
+						const quick = await service.checkVaultFingerprint();
+						if (!isCurrentRequest()) return;
+						if (quick?.upToDate) {
+							semanticPositions = await readLayoutCache(
+								this.app,
+								this.pluginDir,
+								buildLayoutCacheKey(quick.fingerprint, settings)
+							);
+							if (!isCurrentRequest()) return;
+						}
 					}
-					if (!isCurrentRequest()) return;
-					loadedEmbeddings = embeddings;
 
-					if (embeddings.size >= 3) {
-						const paths = Array.from(embeddings.keys());
-						const { buildLayoutCacheKey, readLayoutCache, writeLayoutCache } = await import("./layout-cache");
+					if (!semanticPositions || semanticPositions.size < 3) {
+						semanticPositions = null;
+						let embeddings: Map<string, number[]>;
+						let layoutFingerprint: string | null = null;
+						if (settings.uploadedVectorsFileName.trim()) {
+							embeddings = await this.loadUploadedEmbeddingVectors();
+						} else {
+							const loaded = await this.loadProviderEmbeddings(settings);
+							embeddings = loaded.embeddings;
+							layoutFingerprint = loaded.layoutFingerprint;
+						}
 						if (!isCurrentRequest()) return;
-						const layoutKey = layoutFingerprint
-							? buildLayoutCacheKey(layoutFingerprint, settings)
-							: null;
-						let semanticPositions = layoutKey
-							? await readLayoutCache(this.app, this.pluginDir, layoutKey)
-							: null;
-						if (!isCurrentRequest()) return;
+						this.loadedEmbeddings = embeddings;
 
-						if (!semanticPositions) {
-							const vectors = paths.map((p) => embeddings.get(p)!);
-							const coords = await this.reduceEmbeddings(vectors, settings);
+						if (embeddings.size >= 3) {
+							const paths = Array.from(embeddings.keys());
+							const layoutKey = layoutFingerprint
+								? buildLayoutCacheKey(layoutFingerprint, settings)
+								: null;
+							semanticPositions = layoutKey
+								? await readLayoutCache(this.app, this.pluginDir, layoutKey)
+								: null;
 							if (!isCurrentRequest()) return;
 
-							const computedPositions = new Map<string, [number, number, number]>();
-							paths.forEach((p, i) => computedPositions.set(p, coords[i] as [number, number, number]));
-							semanticPositions = computedPositions;
-							if (layoutKey) {
-								await writeLayoutCache(this.app, this.pluginDir, layoutKey, computedPositions);
+							if (!semanticPositions) {
+								const vectors = paths.map((p) => embeddings.get(p)!);
+								const coords = await this.reduceEmbeddings(vectors, settings);
 								if (!isCurrentRequest()) return;
+
+								const computedPositions = new Map<string, [number, number, number]>();
+								paths.forEach((p, i) => computedPositions.set(p, coords[i] as [number, number, number]));
+								semanticPositions = computedPositions;
+								if (layoutKey) {
+									await writeLayoutCache(this.app, this.pluginDir, layoutKey, computedPositions);
+									if (!isCurrentRequest()) return;
+								}
 							}
 						}
+					}
 
+					if (semanticPositions && semanticPositions.size >= 3) {
 						finalPositions = this.createSemanticLayout(
 								graphData.nodes,
 								spherePositions,
@@ -634,7 +661,7 @@ export class SemanticGraphView extends ItemView {
 			this.renderer.setSuggestionsVisible(this.insightsPanel?.isOpen() ?? false);
 			this.insightsPanel?.setData({
 				graphData,
-				embeddings: loadedEmbeddings,
+				getEmbeddings: () => this.getEmbeddingsLazy(settings),
 				regions,
 				maxSuggestions: settings.suggestedLinkCount,
 			});
@@ -648,6 +675,32 @@ export class SemanticGraphView extends ItemView {
 			this.showError(t("error.generic", { message: msg }));
 			new Notice(t("notice.graphError", { message: msg }));
 		}
+	}
+
+	/**
+	 * Vectors for on-demand consumers (insights, search). Reuses the map from a
+	 * slow-path load when present; otherwise reads the vector cache from disk
+	 * once per load and memoizes.
+	 */
+	private getEmbeddingsLazy(settings: PluginSettings): Promise<Map<string, number[]> | null> {
+		if (this.loadedEmbeddings) return Promise.resolve(this.loadedEmbeddings);
+		if (!this.embeddingsFetchPromise) {
+			this.embeddingsFetchPromise = (async () => {
+				try {
+					if (settings.uploadedVectorsFileName.trim()) {
+						const { readUploadedVectors } = await import("./uploaded-vectors");
+						return await readUploadedVectors(this.app, this.pluginDir);
+					}
+					const { EmbeddingService } = await import("./embedding");
+					const service = new EmbeddingService(this.app, settings, this.pluginDir);
+					const cached = await service.loadCachedEmbeddings();
+					return cached.size > 0 ? cached : null;
+				} catch {
+					return null;
+				}
+			})();
+		}
+		return this.embeddingsFetchPromise;
 	}
 
 	private async loadProviderEmbeddings(
