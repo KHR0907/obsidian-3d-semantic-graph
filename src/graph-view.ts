@@ -805,6 +805,7 @@ export class SemanticGraphView extends ItemView {
 			dragSensitivity: settings.dragSensitivity,
 			showGrid: settings.showGrid,
 			autoOrbitSpeed: settings.autoOrbitSpeed,
+			entryAnimation: settings.entryAnimation,
 			sceneExtent: this.getSceneExtent(),
 		};
 	}

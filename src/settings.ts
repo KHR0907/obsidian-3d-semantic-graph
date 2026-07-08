@@ -275,6 +275,11 @@ export class SemanticGraphSettingTab extends PluginSettingTab {
 						control: { type: "slider", key: "autoOrbitSpeed", min: 0, max: 3, step: 0.1 },
 					},
 					{
+						name: t("settings.entryAnimation.name"),
+						desc: t("settings.entryAnimation.desc"),
+						control: { type: "toggle", key: "entryAnimation" },
+					},
+					{
 						name: t("settings.suggestedLinks.name"),
 						desc: t("settings.suggestedLinks.desc"),
 						control: { type: "slider", key: "suggestedLinkCount", min: 5, max: 100, step: 5 },

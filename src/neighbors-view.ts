@@ -279,6 +279,7 @@ export class NeighborsView extends ItemView {
 			dragSensitivity: settings.dragSensitivity,
 			showGrid: false,
 			autoOrbitSpeed: 0.3,
+			entryAnimation: false,
 			sceneExtent: MINI_SCENE_EXTENT,
 		};
 	}

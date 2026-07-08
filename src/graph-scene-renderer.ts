@@ -20,6 +20,9 @@ const SUGGESTION_LINK_COLOR = "#f59e0b";
 const SUGGESTION_LINK_OPACITY = 0.85;
 const MIN_GRID_DIVISIONS = 24;
 const RESET_VIEW_DURATION_MS = 1000;
+const ENTRY_ANIMATION_DURATION_MS = 1400;
+const ENTRY_START_SCALE = 0.04;
+const ENTRY_CAMERA_DISTANCE_RATIO = 1.7;
 const ORIGIN = new THREE.Vector3(0, 0, 0);
 const INITIAL_CAMERA_UP = new THREE.Vector3(0, 1, 0);
 
@@ -117,6 +120,8 @@ export class GraphSceneRenderer {
 	private autoRotateFrame: number | null = null;
 	private autoRotateResumeTimeout: number | null = null;
 	private resetViewAnimationFrame: number | null = null;
+	private entryScaleFrame: number | null = null;
+	private entryScaleGroup: THREE.Object3D | null = null;
 	private autoRotateStart = 0;
 	private hasUserInteracted = false;
 	private initialCameraState: CameraViewState | null = null;
@@ -137,6 +142,7 @@ export class GraphSceneRenderer {
 		this.linksVisible = linksVisible;
 		this.stopAutoRotateOnInteraction = () => {
 			this.hasUserInteracted = true;
+			this.stopEntryScaleAnimation();
 			this.stopResetViewAnimation();
 			this.stopAutoRotate();
 		};
@@ -196,9 +202,7 @@ export class GraphSceneRenderer {
 			});
 
 		this.applyControlSensitivity();
-		this.initialCameraState = this.getInitialCameraState();
-		this.applyCameraViewState(this.initialCameraState, true);
-		this.enableAutoRotate();
+		this.playEntryAnimation();
 		this.installSceneHelpers();
 		this.syncLinkVisibilityInScene();
 		this.syncNodeAppearance();
@@ -351,6 +355,7 @@ export class GraphSceneRenderer {
 
 	private disposeGraph(): void {
 		this.stopAutoRotate();
+		this.stopEntryScaleAnimation();
 		this.stopResetViewAnimation();
 		this.clearSuggestionObjects();
 		this.clearClusterObjects();
@@ -707,6 +712,102 @@ export class GraphSceneRenderer {
 		if (controls) {
 			controls.enabled = true;
 		}
+	}
+
+	private playEntryAnimation(): void {
+		if (!this.graph) return;
+
+		const initialCameraState = this.getInitialCameraState();
+		this.initialCameraState = this.cloneCameraViewState(initialCameraState);
+		const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+		if (!this.visualOptions.entryAnimation || reduceMotion) {
+			this.applyCameraViewState(initialCameraState, true);
+			this.enableAutoRotate();
+			return;
+		}
+
+		const farCameraState = this.getOrbitCameraViewState(
+			AUTO_ROTATE_INITIAL_ANGLE,
+			this.getResetCameraDistance() * ENTRY_CAMERA_DISTANCE_RATIO
+		);
+		this.applyCameraViewState(farCameraState, true);
+		this.animateCameraViewState(farCameraState, initialCameraState, ENTRY_ANIMATION_DURATION_MS, true, () => {
+			this.enableAutoRotate();
+		});
+		this.startEntryScaleAnimation();
+	}
+
+	// Node/link objects live in the force-graph group; helpers (grid, axes) are
+	// siblings on the scene, so only this group is scaled during entry.
+	private findForceGraphGroup(): THREE.Object3D | null {
+		if (!this.graph) return null;
+		const scene = this.getGraphScene();
+		let group: THREE.Object3D | null = null;
+		scene.traverse((object) => {
+			if (group) return;
+			if ((object as THREE.Object3D & { __graphObjType?: string }).__graphObjType) {
+				let current: THREE.Object3D = object;
+				while (current.parent && current.parent !== scene) {
+					current = current.parent;
+				}
+				group = current;
+			}
+		});
+		return group;
+	}
+
+	private startEntryScaleAnimation(): void {
+		this.stopEntryScaleAnimation();
+
+		const startTime = performance.now();
+		this.entryScaleGroup = this.findForceGraphGroup();
+		this.applyEntryScale(ENTRY_START_SCALE);
+
+		const tick = (now: number) => {
+			if (!this.graph) return;
+
+			// The force-graph group may attach a frame late; keep resolving until found.
+			if (!this.entryScaleGroup) {
+				this.entryScaleGroup = this.findForceGraphGroup();
+			}
+			const progress = Math.min(1, (now - startTime) / ENTRY_ANIMATION_DURATION_MS);
+			const eased = 1 - Math.pow(1 - progress, 3);
+			this.applyEntryScale(ENTRY_START_SCALE + (1 - ENTRY_START_SCALE) * eased);
+
+			if (progress < 1) {
+				this.entryScaleFrame = window.requestAnimationFrame(tick);
+				return;
+			}
+
+			this.entryScaleFrame = null;
+			this.applyEntryScale(1);
+			this.entryScaleGroup = null;
+		};
+
+		this.entryScaleFrame = window.requestAnimationFrame(tick);
+	}
+
+	// Cluster hulls and suggestion lines sit on the scene with world-space
+	// geometry around the origin, so scaling them matches the group scale.
+	private applyEntryScale(scale: number): void {
+		this.entryScaleGroup?.scale.setScalar(scale);
+		for (const object of this.clusterObjects) {
+			object.scale.setScalar(scale);
+		}
+		for (const line of this.suggestionObjects) {
+			line.scale.setScalar(scale);
+		}
+	}
+
+	private stopEntryScaleAnimation(): void {
+		if (this.entryScaleFrame !== null) {
+			window.cancelAnimationFrame(this.entryScaleFrame);
+			this.entryScaleFrame = null;
+		}
+		// Restore unconditionally: cluster/suggestion objects may have been
+		// scaled even while the force-graph group was still unresolved.
+		this.applyEntryScale(1);
+		this.entryScaleGroup = null;
 	}
 
 	private scheduleAutoRotateResume(): void {
