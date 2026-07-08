@@ -1,7 +1,7 @@
 {
 	"id": "3d-semantic-graph",
 	"name": "3D Semantic Graph",
-	"version": "1.3.7",
+	"version": "1.3.8",
 	"minAppVersion": "1.11.0",
 	"description": "Visualize your notes in a 3D semantic space using embedding-based layouts or uploaded vectors.",
 	"author": "KHR0907",
