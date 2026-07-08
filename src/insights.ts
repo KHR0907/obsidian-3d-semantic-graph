@@ -3,8 +3,25 @@ import { GraphLink, GraphNode, getNodePath } from "./types";
 export interface SuggestedLink {
 	source: string;
 	target: string;
+	/** Raw cosine similarity — what the UI displays. */
 	similarity: number;
+	/** Hybrid ranking score (cosine + structural bonuses). */
+	score: number;
 }
+
+/** Structural signals blended into suggestion ranking (not into duplicates). */
+export interface PairSignalContext {
+	/** All tags per note (with or without leading #). */
+	tags: Map<string, string[]>;
+	/** Parent folder per note. */
+	folders: Map<string, string>;
+	/** Linked-neighbor sets per note, from resolved links. */
+	neighbors: Map<string, Set<string>>;
+}
+
+const TAG_WEIGHT = 0.08;
+const FOLDER_WEIGHT = 0.04;
+const CO_LINK_WEIGHT = 0.08;
 
 export interface DuplicatePair {
 	a: string;
@@ -83,6 +100,8 @@ export interface PairInsightsOptions {
 	duplicateThreshold?: number;
 	/** Called with (pairsDone, pairsTotal) whenever the computation yields to the event loop. */
 	onProgress?: (done: number, total: number) => void;
+	/** When provided, suggestions are ranked by cosine + structural bonuses. */
+	signals?: PairSignalContext;
 }
 
 /** Budget per synchronous chunk before yielding back to the UI thread. */
@@ -114,6 +133,14 @@ export async function computePairInsights(
 	let pairsDone = 0;
 	let sliceStart = performance.now();
 
+	const signals = options.signals ?? null;
+	const tagSets = signals
+		? new Map(paths.map((path) => [
+			path,
+			new Set((signals.tags.get(path) ?? []).map((tag) => tag.replace(/^#/, "").toLowerCase())),
+		]))
+		: null;
+
 	for (let i = 0; i < paths.length; i++) {
 		for (let j = i + 1; j < paths.length; j++) {
 			const similarity = dot(vectors[i], vectors[j]);
@@ -121,7 +148,18 @@ export async function computePairInsights(
 				duplicates.push({ a: paths[i], b: paths[j], similarity });
 			}
 			if (maxSuggestions > 0 && !linked.has(pairKey(paths[i], paths[j]))) {
-				insertTopSuggestion(suggestions, maxSuggestions, paths[i], paths[j], similarity);
+				let score = similarity;
+				if (signals && tagSets) {
+					score += TAG_WEIGHT * jaccard(tagSets.get(paths[i])!, tagSets.get(paths[j])!);
+					if (signals.folders.get(paths[i]) === signals.folders.get(paths[j])) {
+						score += FOLDER_WEIGHT;
+					}
+					score += CO_LINK_WEIGHT * neighborJaccard(
+						signals.neighbors.get(paths[i]),
+						signals.neighbors.get(paths[j])
+					);
+				}
+				insertTopSuggestion(suggestions, maxSuggestions, paths[i], paths[j], similarity, score);
 			}
 		}
 		pairsDone += paths.length - 1 - i;
@@ -134,31 +172,47 @@ export async function computePairInsights(
 	}
 
 	options.onProgress?.(totalPairs, totalPairs);
-	suggestions.sort((a, b) => b.similarity - a.similarity);
+	suggestions.sort((a, b) => b.score - a.score);
 	duplicates.sort((a, b) => b.similarity - a.similarity);
 	return { suggestions, duplicates };
 }
 
-/** Keep `suggestions` as a bounded list sorted descending by similarity. */
+function jaccard(a: Set<string>, b: Set<string>): number {
+	if (a.size === 0 || b.size === 0) return 0;
+	const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+	let intersection = 0;
+	for (const item of small) {
+		if (large.has(item)) intersection++;
+	}
+	return intersection / (a.size + b.size - intersection);
+}
+
+function neighborJaccard(a: Set<string> | undefined, b: Set<string> | undefined): number {
+	if (!a || !b) return 0;
+	return jaccard(a, b);
+}
+
+/** Keep `suggestions` as a bounded list sorted descending by hybrid score. */
 function insertTopSuggestion(
 	suggestions: SuggestedLink[],
 	maxCount: number,
 	source: string,
 	target: string,
-	similarity: number
+	similarity: number,
+	score: number
 ): void {
 	if (suggestions.length < maxCount) {
-		suggestions.push({ source, target, similarity });
+		suggestions.push({ source, target, similarity, score });
 		if (suggestions.length === maxCount) {
-			suggestions.sort((a, b) => b.similarity - a.similarity);
+			suggestions.sort((a, b) => b.score - a.score);
 		}
 		return;
 	}
-	if (similarity <= suggestions[maxCount - 1].similarity) return;
+	if (score <= suggestions[maxCount - 1].score) return;
 
-	suggestions[maxCount - 1] = { source, target, similarity };
+	suggestions[maxCount - 1] = { source, target, similarity, score };
 	let k = maxCount - 1;
-	while (k > 0 && suggestions[k].similarity > suggestions[k - 1].similarity) {
+	while (k > 0 && suggestions[k].score > suggestions[k - 1].score) {
 		const tmp = suggestions[k];
 		suggestions[k] = suggestions[k - 1];
 		suggestions[k - 1] = tmp;

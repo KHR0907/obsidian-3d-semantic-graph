@@ -3,6 +3,7 @@ import { ClusterRegion } from "./clustered-sphere-layout";
 import {
 	DuplicatePair,
 	MAX_PAIRWISE_NODES,
+	PairSignalContext,
 	SuggestedLink,
 	computeOrphans,
 	computePairInsights,
@@ -16,6 +17,7 @@ export interface InsightsPanelData {
 	getEmbeddings: () => Promise<Map<string, number[]> | null>;
 	regions: ClusterRegion[];
 	maxSuggestions: number;
+	signals: PairSignalContext;
 }
 
 interface ComputedInsights {
@@ -131,6 +133,7 @@ export class InsightsPanel {
 
 		if (embeddings && embeddings.size >= 2 && embeddings.size <= MAX_PAIRWISE_NODES) {
 			const result = await computePairInsights(embeddings, graphData.links, maxSuggestions, {
+				signals: this.data.signals,
 				onProgress: (done, total) => {
 					if (requestId === this.computeRequestId && total > 0) {
 						this.computingStatusEl?.setText(

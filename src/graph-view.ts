@@ -685,6 +685,7 @@ export class SemanticGraphView extends ItemView {
 				getEmbeddings: () => this.getEmbeddingsLazy(settings),
 				regions,
 				maxSuggestions: settings.suggestedLinkCount,
+				signals: this.buildPairSignals(graphData),
 			});
 			if (this.timelineBar?.isShown()) {
 				this.applyTimelineFromSlider();
@@ -696,6 +697,24 @@ export class SemanticGraphView extends ItemView {
 			this.showError(t("error.generic", { message: msg }));
 			new Notice(t("notice.graphError", { message: msg }));
 		}
+	}
+
+	/** Structural signals (tags, folders, linked neighbors) for hybrid suggestion ranking. */
+	private buildPairSignals(graphData: GraphData): import("./insights").PairSignalContext {
+		const tags = new Map<string, string[]>();
+		const folders = new Map<string, string>();
+		for (const node of graphData.nodes) {
+			tags.set(node.path, node.tags ?? []);
+			folders.set(node.path, node.path.includes("/") ? node.path.substring(0, node.path.lastIndexOf("/")) : "/");
+		}
+		const neighbors = new Map<string, Set<string>>();
+		for (const link of graphData.links) {
+			if (!neighbors.has(link.source)) neighbors.set(link.source, new Set());
+			if (!neighbors.has(link.target)) neighbors.set(link.target, new Set());
+			neighbors.get(link.source)!.add(link.target);
+			neighbors.get(link.target)!.add(link.source);
+		}
+		return { tags, folders, neighbors };
 	}
 
 	/**
